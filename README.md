@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>灵感源自「绝区零」世界观中的"绳网"——一个面向玩家与开发者的游戏交流社区。</strong>
+  <strong>模仿制作的「绝区零」世界观中的"绳网"——新艾利都最大的匿名委托中枢。</strong>
 </p>
 
 <p align="center">
