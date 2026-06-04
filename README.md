@@ -108,54 +108,29 @@ flutter run -d android
 ```
 
 ---
-
-## 📂 目录结构
-
-```
-lib/
-├── api/            # API 接口封装
-├── components/     # 可复用 UI 组件
-├── constants/      # 常量与配置
-├── controllers/    # 业务逻辑（GetX Controller）
-├── gen/            # 自动生成资源（flutter_gen）
-├── helpers/        # 工具函数
-├── models/         # 数据模型
-├── pages/          # 页面视图
-├── services/       # 服务层（验证码、更新检测等）
-└── main.dart       # 应用入口
-```
-
----
-
-## 🔄 CI / CD
-
-| 工作流 | 说明 |
-|--------|------|
-| `android.yml` | 打 tag 时构建 Android APK 并上传 Artifact |
-
----
-
-## ✅ 路线图
-
-- [x] 用户经验 & 等级体系
-- [x] 重构个人主页
-- [ ] 前端整体风格向「绝区零 · 绳网」靠拢
-
----
-
 ## 🤝 贡献指南
 
 欢迎提交 Issue 或 Pull Request，一起完善绳网。
 
-> ⚠️ **注意**：本项目使用Claude Opus 4.6辅助开发，使用前请自行评估。
-
 ---
 
-## 📄 许可证
 
-本项目基于 [MIT License](LICENSE) 开源。
+## ❤️ 致谢
 
-```
-Copyright (c) 2024 share121
-Copyright (c) 2026 KawaYi
-```
+本项目从零开始开发，在实现过程中参考了许多优秀的开源项目与社区资源。
+
+特别感谢：
+
+* share121 开源的 Inter-Knot 项目
+  https://github.com/share121/inter-knot
+
+* ChrisChan13 开发的 zenless-ui 组件库
+  https://github.com/ChrisChan13/zenless-ui
+
+* Alver 提供的部分 UI 设计参考与图片资源
+  https://zenless.tools/
+
+* 所有提交 Issue、Pull Request、反馈问题或提供建议的开发者与用户
+
+同时感谢开源社区以及 AI 工具在开发过程中提供的帮助与支持。
+
