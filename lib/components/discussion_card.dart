@@ -1,8 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:inter_knot/components/async_web_image.dart';
 import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/hover_3d.dart';
 import 'package:inter_knot/controllers/data.dart';
@@ -58,23 +56,6 @@ class NetworkImageBox extends StatelessWidget {
     final src = url?.trim();
     if (src == null || src.isEmpty) {
       return errorBuilder(context);
-    }
-
-    if (kIsWeb) {
-      return AsyncWebImage(
-        url: src,
-        fit: fit,
-        alignment: alignment,
-        filterQuality: filterQuality,
-        cacheWidth: memCacheWidth,
-        cacheHeight: memCacheHeight,
-        gaplessPlayback: gaplessPlayback,
-        webHtmlElementStrategy: preferHtmlElementOnWeb
-            ? WebHtmlElementStrategy.prefer
-            : WebHtmlElementStrategy.never,
-        placeholderBuilder: (context) => loadingBuilder(context, null),
-        errorBuilder: (context, error) => errorBuilder(context),
-      );
     }
 
     final isGif = src.toLowerCase().contains('.gif');

@@ -48,7 +48,7 @@ class _HomePageState extends State<HomePage>
     // Compact layout uses standard scrolling
     final isCompact = MediaQuery.of(context).size.width < 640;
     final showUpdateEntry =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+        defaultTargetPlatform == TargetPlatform.android;
 
     if (!isCompact) {
       return Stack(

@@ -11,13 +11,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
-import 'package:inter_knot/helpers/drop_zone.dart';
+
 import 'package:inter_knot/helpers/image_dimension_helper.dart';
 import 'package:inter_knot/helpers/image_compress_helper.dart';
 import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/helpers/upload_task.dart';
-import 'package:inter_knot/helpers/web_hooks.dart';
+
 import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:markdown_quill/markdown_quill.dart';
@@ -75,7 +75,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   // Images State — each image is tracked as an UploadTask with its own status/progress
   final RxList<UploadTask> _uploadTasks = <UploadTask>[].obs;
   bool _compressBeforeUpload = true;
-  bool _isDragging = false; // 拖拽状态
+
   Timer? _autoSaveDebounce;
   Future<void>? _saveDraftFuture;
   bool _isInitializingDraft = false;
@@ -101,7 +101,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   final Queue<Completer<void>> _compressionWaiters = Queue<Completer<void>>();
   int _activeCompressionCount = 0;
 
-  int get _maxCompressionConcurrency => kIsWeb ? 1 : 2;
+  int get _maxCompressionConcurrency => 2;
 
   /// 已成功上传的图片（便捷 getter）
   List<({String id, String url})> get _uploadedImages => _uploadTasks
@@ -478,68 +478,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     );
   }
 
-  /// 设置粘贴事件监听
-  void _setupPasteListener() {
-    setupPasteListener((filename, bytes, mimeType) {
-      if (!_isAllowedImageFilename(filename)) {
-        showToast('不支持的文件格式，仅支持 JPEG, PNG, GIF, WEBP', isError: true);
-        return;
-      }
 
-      // 在光标位置插入占位符并开始上传
-      final index = _quillController.selection.start;
-      _uploadImageAndInsert(
-        insertIndex: index,
-        filename: filename,
-        bytes: bytes,
-        mimeType: mimeType,
-      );
-    });
-  }
-
-  /// 设置拖拽事件监听（Web 平台）
-  void _setupDropZone() {
-    setupDropZone(
-      onDropImage: (filename, bytes, mimeType) {
-        _handleDroppedImages([
-          (
-            filename: filename,
-            bytes: bytes,
-            mimeType: mimeType,
-          )
-        ]);
-      },
-      onDragStatusChanged: (isDragging) {
-        setState(() {
-          _isDragging = isDragging;
-        });
-      },
-    );
-  }
-
-  /// 处理拖拽上传的图片（用于封面）
-  Future<void> _handleDroppedImages(
-      List<({String filename, Uint8List bytes, String mimeType})> files) async {
-    if (_uploadTasks.length >= _maxCoverImages) {
-      showToast('最多上传 9 张图片', isError: true);
-      return;
-    }
-
-    final remaining = _maxCoverImages - _uploadTasks.length;
-    final toUpload = files.take(remaining).toList();
-
-    for (final file in toUpload) {
-      if (file.bytes.length > _maxImageBytes) {
-        showToast('图片 ${file.filename} 超过 30MB，已跳过', isError: true);
-        continue;
-      }
-      _enqueueUploadTask(
-        filename: file.filename,
-        bytes: file.bytes,
-        mimeType: file.mimeType,
-      );
-    }
-  }
 
   /// 创建上传任务并立即开始压缩+上传（并行）
   void _enqueueUploadTask({
@@ -861,12 +800,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
           continue;
         }
 
-        final Uint8List bytes;
-        if (kIsWeb) {
-          bytes = await file.readAsBytes();
-        } else {
-          bytes = await compute(_readXFileBytes, file.path);
-        }
+        final Uint8List bytes = await compute(_readXFileBytes, file.path);
         final mimeType = file.mimeType ?? 'image/jpeg';
 
         _enqueueUploadTask(
@@ -1208,10 +1142,6 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     titleController.dispose();
     _mobileBodyController.dispose();
     _quillController.dispose();
-    if (kIsWeb) {
-      removePasteListener();
-      removeDropZone();
-    }
     super.dispose();
   }
 
@@ -1225,12 +1155,6 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     titleController.addListener(_handleTitleChanged);
     _mobileBodyController.addListener(_handleMobileBodyChanged);
     _quillController.addListener(_handleQuillChanged);
-
-    // 设置 Web 平台剪贴板粘贴监听
-    if (kIsWeb) {
-      _setupPasteListener();
-      _setupDropZone();
-    }
 
     if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
@@ -1389,16 +1313,9 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       ),
       CreateDiscussionCoverPage(
         uploadTasks: _uploadTasks,
-        isDragging: _isDragging,
         onPickImages: _pickImages,
         onRemoveImageAt: _removeUploadTask,
         onRetryAt: _retryUploadTask,
-        onDroppedImages: _handleDroppedImages,
-        onDraggingChanged: (isDragging) {
-          setState(() {
-            _isDragging = isDragging;
-          });
-        },
       ),
       if (_draftFeaturesEnabled) draftsPage,
     ];

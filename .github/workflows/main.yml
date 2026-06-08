@@ -12,35 +12,6 @@ env:
   CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
 
 jobs:
-  build_windows:
-    name: Windows Client
-    runs-on: windows-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - run: dart gen_secrets.dart
-
-      - run: flutter build windows
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - run: node build-exe.js
-
-      - run: .\enigmavbconsole.exe pack.evb
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: inter_knot_windows_x64_boxed
-          path: inter_knot_windows_x64_boxed.exe
-
   build_android:
     name: Android Client
     runs-on: ubuntu-latest
@@ -95,131 +66,21 @@ jobs:
           name: inter_knot_ios
           path: inter_knot_ios.ipa
 
-  build_macOS:
-    name: MacOS Client
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - run: dart gen_secrets.dart
-
-      - run: flutter build macos
-
-      - run: brew install create-dmg
-      - run: create-dmg --volname 绳网安装器 --background mac-installer-bg.png --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon 绳网.app 200 190 --hide-extension 绳网.app --app-drop-link 600 185 inter_knot_macos.dmg build/macos/Build/Products/Release/绳网.app
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: inter_knot_macos
-          path: inter_knot_macos.dmg
-
-  build_linux:
-    name: Linux Client
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ninja-build libgtk-3-dev
-
-      - run: dart gen_secrets.dart
-
-      - run: flutter build linux
-
-      - run: zip -r9 inter_knot_linux.zip build/linux/x64/release/bundle
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: inter_knot_linux
-          path: inter_knot_linux.zip
-
-  build_web:
-    name: Web Client
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - run: dart gen_secrets.dart
-
-      - run: flutter build web --web-renderer html
-
-      - run: echo "db97e0128d9a02eef17b05a3c3ff8691742e6ab3" > build/web/12e2a2a7bc7f973a3f3720dcd9bb923b.txt
-
-      - run: gzip -rk9 build/web
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: inter_knot_web
-          path: build/web
-
-  deploy:
-    name: Deploy
-    needs: build_web
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: inter_knot_web
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: .
-          cname: www.inot.top
-
   release:
     name: Release
     needs:
-      - build_windows
       - build_android
       - build_iOS
-      - build_macOS
-      - build_linux
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: inter_knot_windows_x64_boxed
-          path: inter_knot_windows_x64_boxed
 
       - uses: actions/download-artifact@v4
         with:
           name: inter_knot_apk
           path: inter_knot_apk
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: inter_knot_linux
-          path: inter_knot_linux
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: inter_knot_macos
-          path: inter_knot_macos
 
       - uses: actions/download-artifact@v4
         with:
@@ -231,8 +92,5 @@ jobs:
         with:
           body_path: release-content.md
           files: |
-            inter_knot_windows_x64_boxed/inter_knot_windows_x64_boxed.exe
             inter_knot_apk/inter_knot_android.apk
-            inter_knot_linux/inter_knot_linux.zip
-            inter_knot_macos/inter_knot_macos.dmg
             inter_knot_ios/inter_knot_ios.ipa

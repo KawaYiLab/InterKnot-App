@@ -124,7 +124,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _checkForUpdatesOnStartup() async {
     // Only check on Android platform
-    if (!kIsWeb && Platform.isAndroid) {
+    if (Platform.isAndroid) {
       // Delay to avoid blocking app startup
       await Future.delayed(const Duration(seconds: 2));
 

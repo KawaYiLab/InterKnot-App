@@ -2,9 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'legacy_get_storage_migration_stub.dart'
-    if (dart.library.io) 'legacy_get_storage_migration_io.dart'
-    if (dart.library.html) 'legacy_get_storage_migration_web.dart';
+import 'legacy_get_storage_migration_io.dart';
 
 final box = AppBox();
 

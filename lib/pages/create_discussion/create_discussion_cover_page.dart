@@ -1,4 +1,3 @@
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -15,94 +14,47 @@ class CreateDiscussionCoverPage extends StatelessWidget {
   const CreateDiscussionCoverPage({
     super.key,
     required this.uploadTasks,
-    required this.isDragging,
     required this.onPickImages,
     required this.onRemoveImageAt,
     required this.onRetryAt,
-    required this.onDroppedImages,
-    required this.onDraggingChanged,
   });
 
   final RxList<UploadTask> uploadTasks;
-  final bool isDragging;
   final VoidCallback onPickImages;
   final void Function(int index) onRemoveImageAt;
   final void Function(UploadTask task) onRetryAt;
-  final Future<void> Function(List<DroppedImageFile> files) onDroppedImages;
-  final ValueChanged<bool> onDraggingChanged;
 
   @override
   Widget build(BuildContext context) {
-    final content = Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isDragging ? const Color(0xffFBC02D) : Colors.transparent,
-          width: 2,
-        ),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Obx(() {
-        final tasks = uploadTasks;
-        return GridView.builder(
-          padding: const EdgeInsets.all(16),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 160,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-          ),
-          itemCount: tasks.length + (tasks.length < 9 ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == tasks.length) {
-              return _AddButton(
-                isDragging: isDragging,
-                onTap: onPickImages,
-              );
-            }
-
-            final task = tasks[index];
-            return _UploadTaskTile(
-              task: task,
-              index: index,
-              allTasks: tasks,
-              onRemove: () => onRemoveImageAt(index),
-              onRetry: () => onRetryAt(task),
-            );
-          },
-        );
-      }),
-    );
-
     return Column(
       children: [
         Expanded(
-          child: kIsWeb
-              ? content
-              : DropTarget(
-                  onDragDone: (detail) async {
-                    final files = detail.files;
-                    if (files.isEmpty) return;
+          child: Obx(() {
+            final tasks = uploadTasks;
+            return GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 160,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+              ),
+              itemCount: tasks.length + (tasks.length < 9 ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == tasks.length) {
+                  return _AddButton(onTap: onPickImages);
+                }
 
-                    final imageFiles = <DroppedImageFile>[];
-                    for (final file in files) {
-                      final mimeType = file.mimeType ?? 'image/jpeg';
-                      if (!mimeType.startsWith('image/')) continue;
-
-                      final bytes = await file.readAsBytes();
-                      imageFiles.add((
-                        filename: file.name,
-                        bytes: bytes,
-                        mimeType: mimeType,
-                      ));
-                    }
-
-                    if (imageFiles.isNotEmpty) {
-                      await onDroppedImages(imageFiles);
-                    }
-                  },
-                  onDragEntered: (_) => onDraggingChanged(true),
-                  onDragExited: (_) => onDraggingChanged(false),
-                  child: content,
-                ),
+                final task = tasks[index];
+                return _UploadTaskTile(
+                  task: task,
+                  index: index,
+                  allTasks: tasks,
+                  onRemove: () => onRemoveImageAt(index),
+                  onRetry: () => onRetryAt(task),
+                );
+              },
+            );
+          }),
         ),
       ],
     );
@@ -110,47 +62,32 @@ class CreateDiscussionCoverPage extends StatelessWidget {
 }
 
 class _AddButton extends StatelessWidget {
-  const _AddButton({required this.isDragging, required this.onTap});
-  final bool isDragging;
+  const _AddButton({required this.onTap});
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDragging
-                  ? const Color(0xffFBC02D)
-                  : const Color(0xff313132),
-              width: 2,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: const Color(0xff313132),
+            width: 2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xff1E1E1E),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, size: 32, color: Colors.grey),
+            SizedBox(height: 4),
+            Text(
+              '添加图片',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
             ),
-            borderRadius: BorderRadius.circular(8),
-            color: isDragging
-                ? const Color(0xffFBC02D).withValues(alpha: 0.1)
-                : const Color(0xff1E1E1E),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isDragging ? Icons.cloud_upload : Icons.add,
-                size: 32,
-                color: isDragging ? const Color(0xffFBC02D) : Colors.grey,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isDragging ? '释放以上传' : '添加图片',
-                style: TextStyle(
-                  color: isDragging ? const Color(0xffFBC02D) : Colors.grey,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
