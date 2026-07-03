@@ -807,7 +807,7 @@ class Controller extends GetxController {
   bool isFetchPinDiscussions = true;
   final searchController = SearchController();
 
-  late final refreshSearchData = throttle(() async {
+  Future<void> _reloadFeed() async {
     // 重置定时器，避免刷新时刚好触发轮询
     _startNewPostCheck();
     isSearching(true);
@@ -827,7 +827,9 @@ class Controller extends GetxController {
     } finally {
       isSearching(false);
     }
-  }, Duration.zero);
+  }
+
+  late final refreshSearchData = throttle(_reloadFeed, Duration.zero);
 
   /// 拉取频道列表（尽力而为，失败不影响首页）。
   Future<void> loadCategories() async {
@@ -839,11 +841,28 @@ class Controller extends GetxController {
     }
   }
 
+  bool _isSwitchingCategory = false;
+
   /// 切换当前频道过滤项并刷新首页。空 slug 代表「全部」。
+  /// 不走节流的 refreshSearchData——快速连点不同 tab 时，节流会丢弃后续刷新，
+  /// 导致 UI 高亮的分区与列表内容不一致。这里直接刷新并在拉取期间若 slug
+  /// 又变化则再刷一次，保证「最后一次点击」胜出。
   Future<void> selectCategory(String slug) async {
     if (selectedCategorySlug.value == slug) return;
     selectedCategorySlug.value = slug;
-    await refreshSearchData();
+
+    // 已有切换在跑：仅更新目标 slug，正在运行的循环会重新拉取。
+    if (_isSwitchingCategory) return;
+    _isSwitchingCategory = true;
+    try {
+      String target;
+      do {
+        target = selectedCategorySlug.value;
+        await _reloadFeed();
+      } while (selectedCategorySlug.value != target);
+    } finally {
+      _isSwitchingCategory = false;
+    }
   }
 
   final searchCache = <String?>{};
