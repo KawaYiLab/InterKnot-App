@@ -10,16 +10,19 @@ import 'package:inter_knot/models/author.dart';
 import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
+import 'package:inter_knot/models/exam.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/models/pagination.dart';
 import 'package:inter_knot/controllers/data.dart';
+import 'package:inter_knot/pages/exam_route_state.dart';
 
 part 'api_auth.dart';
 part 'api_system.dart';
 part 'api_category.dart';
 part 'api_article.dart';
 part 'api_comment.dart';
+part 'api_exam.dart';
 part 'api_interaction.dart';
 part 'api_profile.dart';
 part 'api_upload.dart';
@@ -38,6 +41,39 @@ String? _captchaErrorMessage(String? code) {
     default:
       return null;
   }
+}
+
+bool _isExamRequiredResponse(dynamic body) {
+  if (body is! Map) return false;
+  final error = body['error'];
+  if (error is! Map) return false;
+  return error['code']?.toString() == 'EXAM_REQUIRED';
+}
+
+bool _shouldOpenExamPage(String path, dynamic body) {
+  if (path.startsWith('/api/exam')) return false;
+  if (ExamRouteState.isOpen) return false;
+  return _isExamRequiredResponse(body);
+}
+
+bool _examRedirectInFlight = false;
+
+void _openExamPageIfNeeded(String path, dynamic body) {
+  if (!_shouldOpenExamPage(path, body)) return;
+  if (_examRedirectInFlight) return;
+  _examRedirectInFlight = true;
+  unawaited(Future<void>(() async {
+    try {
+      if (ExamRouteState.isOpen) return;
+      if (Get.currentRoute == '/exam') return;
+      if (Get.isDialogOpen == true) return;
+      final builder = ExamRouteState.examPageBuilder;
+      if (builder == null) return;
+      await Get.to(builder);
+    } finally {
+      _examRedirectInFlight = false;
+    }
+  }));
 }
 
 class AuthApi extends GetConnect {
@@ -89,6 +125,9 @@ class BaseConnect extends GetConnect {
         // Do NOT redirect to login page automatically, let the UI handle the unauthenticated state
         // or let the user choose to login again.
         // Get.offAll(() => const LoginPage());
+      }
+      if (rep.statusCode == 403) {
+        _openExamPageIfNeeded(req.url.path, rep.body);
       }
       return rep;
     });

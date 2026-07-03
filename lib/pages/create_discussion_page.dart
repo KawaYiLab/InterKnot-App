@@ -30,6 +30,8 @@ import 'package:inter_knot/pages/create_discussion/create_discussion_editor_page
 import 'package:inter_knot/pages/create_discussion/create_discussion_header.dart';
 import 'package:inter_knot/pages/create_discussion/create_discussion_mobile_nav.dart';
 import 'package:inter_knot/pages/create_discussion/create_discussion_post_settings_sheet.dart';
+import 'package:inter_knot/pages/exam_page.dart';
+import 'package:inter_knot/models/exam.dart';
 
 import 'package:inter_knot/models/discussion.dart';
 import 'package:markdown/markdown.dart' as md;
@@ -88,6 +90,8 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   late final bool _draftFeaturesEnabled;
   String? _documentId;
   String? _selectedCategorySlug;
+  ExamStatus? _examStatus;
+  bool _isLoadingExamStatus = true;
   String _lastSavedSnapshot = '';
   List<dynamic>? _persistedEditorState;
   String _persistedBodyText = '';
@@ -136,13 +140,23 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   }
 
   bool get _canPublish =>
+      !_isLoadingExamStatus &&
       !_isInitializingDraft &&
       !_isSavingDraft &&
       !_isPublishing &&
       !_isDeletingDraft &&
+      !_needsExamGate &&
       !_isCoverUploading &&
       titleController.text.trim().isNotEmpty &&
       (_currentBodyText.trim().isNotEmpty || _uploadedImages.isNotEmpty);
+
+  bool get _needsExamGate {
+    if (!_draftFeaturesEnabled) return false;
+    if (_isLoadingExamStatus) return false;
+    if (_examStatus == null) return false;
+    if (_examStatus!.passed) return false;
+    return true;
+  }
 
   bool get _supportsDeleteCurrentDraft =>
       _draftFeaturesEnabled &&
@@ -280,6 +294,28 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       return authorId;
     }
     return c.ensureAuthorForUser(user);
+  }
+
+  Future<void> _loadExamStatus({bool force = false}) async {
+    if (!force && !_isLoadingExamStatus && _examStatus != null) return;
+    try {
+      final status = await api.getExamStatus();
+      if (!mounted) return;
+      setState(() {
+        _examStatus = status;
+        _isLoadingExamStatus = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingExamStatus = false;
+      });
+    }
+  }
+
+  Future<void> _openExamPage() async {
+    await Get.to(() => const ExamPage());
+    await _loadExamStatus(force: true);
   }
 
   String _extractResponseMessage(Response<Map<String, dynamic>> res) {
@@ -1174,6 +1210,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       unawaited(c.loadCategories());
     }
 
+    unawaited(_loadExamStatus());
     if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
     }
@@ -1181,6 +1218,11 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   }
 
   Future<void> _publish({bool isMobile = false}) async {
+    if (_needsExamGate) {
+      showToast('需要先通过入网测验才能发帖', isError: true);
+      return;
+    }
+
     _isDesktopEditorActive = !isMobile;
 
     final title = titleController.text.trim();
@@ -1283,6 +1325,121 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     );
   }
 
+  Widget _editorOrExamGate(Widget editor) {
+    if (_isLoadingExamStatus) {
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xffD7FF00),
+        ),
+      );
+    }
+    if (_needsExamGate) {
+      return _buildExamGatePage();
+    }
+    return editor;
+  }
+
+  Widget _buildExamGatePage() {
+    final status = _examStatus;
+    final config = status?.config;
+    final cooldownRemaining = status?.cooldownRemaining ?? 0;
+    final activeAttempt = status?.activeAttempt;
+    final hasActiveAttempt = activeAttempt != null;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: const Color(0xff101010),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xff2A2A2A)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.shield_outlined,
+                  color: Color(0xffD7FF00),
+                  size: 52,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '需要先通过入网测验才能发帖',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  hasActiveAttempt
+                      ? '你有一场进行中的考试，可以继续作答。'
+                      : cooldownRemaining > 0
+                          ? '考试失败次数过多，请稍后再试。'
+                          : '通过后即可解锁发帖、评论等写操作。',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xffB0B0B0),
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                if (config != null) ...[
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      _ExamGateStatChip(
+                        label: '题数',
+                        value: '${config.questionCount}',
+                      ),
+                      _ExamGateStatChip(
+                        label: '时限',
+                        value: '${(config.timeLimitSeconds / 60).round()} 分钟',
+                      ),
+                      _ExamGateStatChip(
+                        label: '及格',
+                        value: '${config.passScorePercent}%',
+                      ),
+                      _ExamGateStatChip(
+                        label: '奖励',
+                        value: '${config.rewardDenny} 丁尼 / ${config.rewardExp} 经验',
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _openExamPage,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xffD7FF00),
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(hasActiveAttempt ? '继续考试' : '前往考试'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
@@ -1297,21 +1454,23 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     final double layoutFactor = baseFactor * zoomScale;
 
     // Mobile uses a simple TextField editor; desktop uses the Quill PageView
-    final mobileEditor = CreateDiscussionEditorPage(
-      titleController: titleController,
-      quillController: _quillController,
-      onPickAndUploadImage: _pickAndUploadImage,
-      selectedCategorySlug: _selectedCategorySlug,
-      onCategorySelected: _onCategorySelected,
-      isMobile: true,
-      mobileBodyController: _mobileBodyController,
-      mobileUploadTasks: _uploadTasks,
-      onRemoveMobileImage: _removeUploadTask,
-      onRetryMobileImage: _retryUploadTask,
-      onPickCoverImages: _pickImages,
-      onOpenPostSettings: _showMobilePostSettingsSheet,
-      mobileCompressBeforeUpload: _compressBeforeUpload,
-      mobileMaxCoverImages: _maxCoverImages,
+    final mobileEditor = _editorOrExamGate(
+      CreateDiscussionEditorPage(
+        titleController: titleController,
+        quillController: _quillController,
+        onPickAndUploadImage: _pickAndUploadImage,
+        selectedCategorySlug: _selectedCategorySlug,
+        onCategorySelected: _onCategorySelected,
+        isMobile: true,
+        mobileBodyController: _mobileBodyController,
+        mobileUploadTasks: _uploadTasks,
+        onRemoveMobileImage: _removeUploadTask,
+        onRetryMobileImage: _retryUploadTask,
+        onPickCoverImages: _pickImages,
+        onOpenPostSettings: _showMobilePostSettingsSheet,
+        mobileCompressBeforeUpload: _compressBeforeUpload,
+        mobileMaxCoverImages: _maxCoverImages,
+      ),
     );
 
     final draftsPage = Obx(
@@ -1326,12 +1485,14 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     );
 
     final contentPages = <Widget>[
-      CreateDiscussionEditorPage(
-        titleController: titleController,
-        quillController: _quillController,
-        onPickAndUploadImage: _pickAndUploadImage,
-        selectedCategorySlug: _selectedCategorySlug,
-        onCategorySelected: _onCategorySelected,
+      _editorOrExamGate(
+        CreateDiscussionEditorPage(
+          titleController: titleController,
+          quillController: _quillController,
+          onPickAndUploadImage: _pickAndUploadImage,
+          selectedCategorySlug: _selectedCategorySlug,
+          onCategorySelected: _onCategorySelected,
+        ),
       ),
       CreateDiscussionCoverPage(
         uploadTasks: _uploadTasks,
@@ -1503,6 +1664,50 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ExamGateStatChip extends StatelessWidget {
+  const _ExamGateStatChip({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xff181818),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xff2A2A2A)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xff9A9A9A),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
