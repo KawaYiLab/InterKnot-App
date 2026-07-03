@@ -8,6 +8,7 @@ import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/helpers/box.dart';
 import 'package:inter_knot/models/author.dart';
 import 'package:inter_knot/models/captcha.dart';
+import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
@@ -16,6 +17,7 @@ import 'package:inter_knot/controllers/data.dart';
 
 part 'api_auth.dart';
 part 'api_system.dart';
+part 'api_category.dart';
 part 'api_article.dart';
 part 'api_comment.dart';
 part 'api_interaction.dart';

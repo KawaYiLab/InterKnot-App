@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:get/get.dart';
+import 'package:inter_knot/components/category_tab_bar.dart';
 import 'package:inter_knot/components/discussions_grid.dart';
 import 'package:inter_knot/components/zzz_desktop_action_button.dart';
 import 'package:inter_knot/controllers/data.dart';
@@ -48,6 +49,7 @@ class _SearchPageState extends State<SearchPage>
       children: [
         Column(
           children: [
+            const CategoryTabBar(),
             Expanded(
               child: Stack(
                 children: [

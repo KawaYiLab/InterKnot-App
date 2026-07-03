@@ -13,6 +13,7 @@ import 'package:inter_knot/helpers/num2dur.dart';
 import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
@@ -29,6 +30,10 @@ class Controller extends GetxController {
 
   final searchQuery = ''.obs;
   final searchResult = <HDataModel>{}.obs; // HData -> HDataModel
+  // 频道/分区：categories 为可选的 tab 列表，selectedCategorySlug 为当前过滤项
+  // （空字符串代表「全部」，不过滤）。
+  final categories = <CategoryModel>[].obs;
+  final selectedCategorySlug = ''.obs;
   // Persistent storage key for offline cache
   static const String _searchCacheKey = 'offline_search_cache';
   String? searchEndCur;
@@ -540,6 +545,9 @@ class Controller extends GetxController {
       }
     }
 
+    // 频道列表并行加载，不阻塞首页首屏。
+    unawaited(loadCategories());
+
     try {
       await searchData();
     } catch (e) {
@@ -595,7 +603,8 @@ class Controller extends GetxController {
     if (isSearching.value) return;
 
     try {
-      final pagination = await api.search('', '');
+      final pagination =
+          await api.search('', '', categorySlug: selectedCategorySlug.value);
 
       // Check again if we started searching while waiting for api
       if (isSearching.value) return;
@@ -649,7 +658,8 @@ class Controller extends GetxController {
     _startNewPostCheck();
     isSearching(true);
     try {
-      final pagination = await api.search('', '');
+      final pagination =
+          await api.search('', '', categorySlug: selectedCategorySlug.value);
       final existingIds = searchResult.map((e) => e.id).toSet();
       final inserted = pagination.nodes
           .where((e) => e.id.isNotEmpty && !existingIds.contains(e.id))
@@ -670,11 +680,15 @@ class Controller extends GetxController {
       }
 
       // Keep offline cache in sync with latest merged list.
-      try {
-        final cacheList = searchResult.map((e) => e.toJson()).toList();
-        box.write(_searchCacheKey, cacheList);
-      } catch (e) {
-        logger.e('Failed to save offline cache', error: e);
+      // 仅在「全部」频道（无过滤）时写入通用离线缓存，避免过滤子集被当成
+      // 全量首屏在下次启动时展示。
+      if (selectedCategorySlug.value.isEmpty) {
+        try {
+          final cacheList = searchResult.map((e) => e.toJson()).toList();
+          box.write(_searchCacheKey, cacheList);
+        } catch (e) {
+          logger.e('Failed to save offline cache', error: e);
+        }
       }
 
       newPostCount.value = 0;
@@ -793,7 +807,7 @@ class Controller extends GetxController {
   bool isFetchPinDiscussions = true;
   final searchController = SearchController();
 
-  late final refreshSearchData = throttle(() async {
+  Future<void> _reloadFeed() async {
     // 重置定时器，避免刷新时刚好触发轮询
     _startNewPostCheck();
     isSearching(true);
@@ -813,7 +827,43 @@ class Controller extends GetxController {
     } finally {
       isSearching(false);
     }
-  }, Duration.zero);
+  }
+
+  late final refreshSearchData = throttle(_reloadFeed, Duration.zero);
+
+  /// 拉取频道列表（尽力而为，失败不影响首页）。
+  Future<void> loadCategories() async {
+    try {
+      final list = await api.getCategories();
+      if (list.isNotEmpty) categories.assignAll(list);
+    } catch (e) {
+      logger.w('Failed to load categories: $e');
+    }
+  }
+
+  bool _isSwitchingCategory = false;
+
+  /// 切换当前频道过滤项并刷新首页。空 slug 代表「全部」。
+  /// 不走节流的 refreshSearchData——快速连点不同 tab 时，节流会丢弃后续刷新，
+  /// 导致 UI 高亮的分区与列表内容不一致。这里直接刷新并在拉取期间若 slug
+  /// 又变化则再刷一次，保证「最后一次点击」胜出。
+  Future<void> selectCategory(String slug) async {
+    if (selectedCategorySlug.value == slug) return;
+    selectedCategorySlug.value = slug;
+
+    // 已有切换在跑：仅更新目标 slug，正在运行的循环会重新拉取。
+    if (_isSwitchingCategory) return;
+    _isSwitchingCategory = true;
+    try {
+      String target;
+      do {
+        target = selectedCategorySlug.value;
+        await _reloadFeed();
+      } while (selectedCategorySlug.value != target);
+    } finally {
+      _isSwitchingCategory = false;
+    }
+  }
 
   final searchCache = <String?>{};
   Future<void> searchData() async {
@@ -822,7 +872,11 @@ class Controller extends GetxController {
 
     final isFirstPage = searchEndCur == null || searchEndCur!.isEmpty;
 
-    final pagination = await api.search(searchQuery(), searchEndCur ?? '');
+    final pagination = await api.search(
+      searchQuery(),
+      searchEndCur ?? '',
+      categorySlug: selectedCategorySlug.value,
+    );
     // pagination returns PaginationModel<HDataModel>
     // destructure:
     searchEndCur = pagination.endCursor;
@@ -835,10 +889,12 @@ class Controller extends GetxController {
     }
 
     // Save to offline cache if this is the first page of default search
+    // （仅「全部」频道、无搜索词时写入，过滤态不污染通用缓存）。
     if ((searchEndCur == null ||
             searchEndCur!.isEmpty ||
             searchEndCur == ApiConfig.defaultPageSize.toString()) &&
-        searchQuery().isEmpty) {
+        searchQuery().isEmpty &&
+        selectedCategorySlug.value.isEmpty) {
       try {
         final cacheList = searchResult.map((e) => e.toJson()).toList();
         box.write(_searchCacheKey, cacheList);
