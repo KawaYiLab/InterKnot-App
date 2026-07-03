@@ -182,11 +182,14 @@ class _ExamPageState extends State<ExamPage> {
                     : null
                 : null
             : null;
-        setState(() {
-          _isCooldown = true;
-          _cooldownRemaining = int.tryParse(retryAfter?.toString() ?? '') ?? _cooldownRemaining;
-          _phase = _ExamPhase.intro;
-        });
+        if (mounted) {
+          setState(() {
+            _isCooldown = true;
+            _cooldownRemaining =
+                int.tryParse(retryAfter?.toString() ?? '') ?? _cooldownRemaining;
+            _phase = _ExamPhase.intro;
+          });
+        }
         showToast('考试失败次数过多，请稍后再试', isError: true);
         return;
       }
@@ -356,7 +359,7 @@ class _ExamPageState extends State<ExamPage> {
     final config = status?.config;
     final passed = status?.passed == true;
     final activeAttempt = status?.activeAttempt;
-    final cooldown = status?.cooldownRemaining ?? _cooldownRemaining;
+    final cooldown = _cooldownRemaining;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
