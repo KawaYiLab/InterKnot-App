@@ -680,11 +680,15 @@ class Controller extends GetxController {
       }
 
       // Keep offline cache in sync with latest merged list.
-      try {
-        final cacheList = searchResult.map((e) => e.toJson()).toList();
-        box.write(_searchCacheKey, cacheList);
-      } catch (e) {
-        logger.e('Failed to save offline cache', error: e);
+      // 仅在「全部」频道（无过滤）时写入通用离线缓存，避免过滤子集被当成
+      // 全量首屏在下次启动时展示。
+      if (selectedCategorySlug.value.isEmpty) {
+        try {
+          final cacheList = searchResult.map((e) => e.toJson()).toList();
+          box.write(_searchCacheKey, cacheList);
+        } catch (e) {
+          logger.e('Failed to save offline cache', error: e);
+        }
       }
 
       newPostCount.value = 0;
@@ -866,10 +870,12 @@ class Controller extends GetxController {
     }
 
     // Save to offline cache if this is the first page of default search
+    // （仅「全部」频道、无搜索词时写入，过滤态不污染通用缓存）。
     if ((searchEndCur == null ||
             searchEndCur!.isEmpty ||
             searchEndCur == ApiConfig.defaultPageSize.toString()) &&
-        searchQuery().isEmpty) {
+        searchQuery().isEmpty &&
+        selectedCategorySlug.value.isEmpty) {
       try {
         final cacheList = searchResult.map((e) => e.toJson()).toList();
         box.write(_searchCacheKey, cacheList);
