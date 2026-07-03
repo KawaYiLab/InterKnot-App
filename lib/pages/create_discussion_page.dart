@@ -140,7 +140,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   }
 
   bool get _canPublish =>
-      !_isLoadingExamStatus &&
+      !(_draftFeaturesEnabled && _isLoadingExamStatus) &&
       !_isInitializingDraft &&
       !_isSavingDraft &&
       !_isPublishing &&
@@ -1210,7 +1210,11 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       unawaited(c.loadCategories());
     }
 
-    unawaited(_loadExamStatus());
+    if (_draftFeaturesEnabled) {
+      unawaited(_loadExamStatus());
+    } else {
+      _isLoadingExamStatus = false;
+    }
     if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
     }
@@ -1326,7 +1330,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   }
 
   Widget _editorOrExamGate(Widget editor) {
-    if (_isLoadingExamStatus) {
+    if (_draftFeaturesEnabled && _isLoadingExamStatus) {
       return const Center(
         child: CircularProgressIndicator(
           color: Color(0xffD7FF00),
