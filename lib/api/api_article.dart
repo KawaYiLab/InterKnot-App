@@ -118,8 +118,13 @@ extension ArticleApi on Api {
 
 
   Future<PaginationModel<HDataModel>> search(
-      String query, String endCur) async {
+      String query, String endCur,
+      {String? categorySlug}) async {
     final start = int.tryParse(endCur.isEmpty ? '0' : endCur) ?? 0;
+    // 空 / 'all' 视为不过滤（与后端 parseCategorySlug 语义一致）。
+    final hasCategory = categorySlug != null &&
+        categorySlug.isNotEmpty &&
+        categorySlug != 'all';
 
     if (query.isEmpty) {
       final res = await get(
@@ -127,6 +132,7 @@ extension ArticleApi on Api {
         query: {
           'start': start.toString(),
           'limit': ApiConfig.defaultPageSize.toString(),
+          if (hasCategory) 'category': categorySlug,
         },
       );
 
@@ -157,6 +163,7 @@ extension ArticleApi on Api {
         'q': query,
         'start': start.toString(),
         'limit': ApiConfig.defaultPageSize.toString(),
+        if (hasCategory) 'category': categorySlug,
       },
     );
 
