@@ -464,9 +464,15 @@ class Controller extends GetxController {
     final token = getToken();
     if (token.isNotEmpty) {
       try {
-        final renewedToken = await api.renewToken();
-        if (renewedToken != null && renewedToken.isNotEmpty) {
-          await setToken(renewedToken);
+        // token 续期仅为尽力而为：失败（网络/超时）时继续用现有 token，
+        // 只有后续 refreshSelfUserInfo 真的鉴权失败才按未登录清 session。
+        try {
+          final renewedToken = await api.renewToken();
+          if (renewedToken != null && renewedToken.isNotEmpty) {
+            await setToken(renewedToken);
+          }
+        } catch (e) {
+          logger.w('Token renew failed, continue with existing token: $e');
         }
         await refreshSelfUserInfo(rethrowOnError: true);
         isLogin(true);

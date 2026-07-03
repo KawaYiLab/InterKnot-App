@@ -181,23 +181,31 @@ class _DiscussionPageState extends State<DiscussionPage> {
   }
 
   Future<void> _checkNewComments({bool syncOnly = false}) async {
-    final count = widget.discussion.commentsCount;
-    if (syncOnly) {
-      if (_newCommentCounts.value.newCount > 0) {
+    try {
+      final count =
+          await Get.find<Api>().getCommentCount(widget.discussion.id);
+      if (syncOnly) {
+        final shouldRefresh = count != widget.discussion.commentsCount;
+        widget.discussion.commentsCount = count;
+        if (_newCommentCounts.value.newCount > 0) {
+          _newCommentCounts.value =
+              const NewCommentCounts(newCount: 0, serverCount: 0);
+        }
+        if (shouldRefresh && mounted) setState(() {});
+        return;
+      }
+
+      if (count > widget.discussion.commentsCount) {
+        _newCommentCounts.value = NewCommentCounts(
+          newCount: count - widget.discussion.commentsCount,
+          serverCount: count,
+        );
+      } else if (_newCommentCounts.value.newCount > 0) {
         _newCommentCounts.value =
             const NewCommentCounts(newCount: 0, serverCount: 0);
       }
-      return;
-    }
-
-    if (count > widget.discussion.commentsCount) {
-      _newCommentCounts.value = NewCommentCounts(
-        newCount: count - widget.discussion.commentsCount,
-        serverCount: count,
-      );
-    } else if (_newCommentCounts.value.newCount > 0) {
-      _newCommentCounts.value =
-          const NewCommentCounts(newCount: 0, serverCount: 0);
+    } catch (e) {
+      // 静默失败：拉不到服务端评论数时不打扰用户
     }
   }
 

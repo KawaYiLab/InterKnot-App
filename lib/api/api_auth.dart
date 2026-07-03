@@ -1,5 +1,26 @@
 part of 'api.dart';
 
+/// 从响应体提取后端返回的错误信息（Strapi 的 error.message），回退到状态文本，
+/// 避免用户只看到 "Bad Request" 这类通用 HTTP 状态。
+String _authErrorMessage(Response res) {
+  final statusText = res.statusText ?? 'Request failed';
+  if (statusText.contains('XMLHttpRequest error')) {
+    return '短时间内请求数量过多';
+  }
+  try {
+    final body = res.body;
+    if (body is Map && body['error'] != null) {
+      final error = body['error'];
+      if (error is Map) {
+        return error['message']?.toString() ?? statusText;
+      } else if (error is String) {
+        return error;
+      }
+    }
+  } catch (_) {}
+  return statusText;
+}
+
 extension AuthApiExtensions on AuthApi {
   Future<({String? token, AuthorModel user})> login(
       String email, String password,
@@ -12,7 +33,7 @@ extension AuthApiExtensions on AuthApi {
     if (res.hasError) {
       debugPrint('Login Error: ${res.statusCode} - ${res.bodyString}');
       throw ApiException(
-        res.statusText ?? 'Request failed',
+        _authErrorMessage(res),
         statusCode: res.statusCode,
       );
     }
@@ -43,7 +64,7 @@ extension AuthApiExtensions on AuthApi {
     if (res.hasError) {
       debugPrint('Register Error: ${res.statusCode} - ${res.bodyString}');
       throw ApiException(
-        res.statusText ?? 'Request failed',
+        _authErrorMessage(res),
         statusCode: res.statusCode,
       );
     }

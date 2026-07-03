@@ -62,6 +62,37 @@ extension CommentApi on Api {
   }
 
 
+  /// 取服务端评论总数。后端已移除 /api/comments/count，改用 /api/comments/list
+  /// 的 meta.pagination.total（用最小分页避免拉全量）。
+  Future<int> getCommentCount(String discussionId) async {
+    final res = await get(
+      '/api/comments/list',
+      query: {
+        'article': discussionId,
+        'start': '0',
+        'limit': '1',
+        'ts': DateTime.now().millisecondsSinceEpoch.toString(),
+      },
+    );
+
+    if (res.hasError) return 0;
+
+    final body = res.body;
+    if (body is Map) {
+      final meta = body['meta'];
+      if (meta is Map) {
+        final pagination = meta['pagination'];
+        if (pagination is Map) {
+          final total = pagination['total'];
+          if (total is int) return total;
+          return int.tryParse(total?.toString() ?? '') ?? 0;
+        }
+      }
+    }
+    return 0;
+  }
+
+
   Future<Response<Map<String, dynamic>>> addDiscussionComment(
     String discussionId,
     String body, {

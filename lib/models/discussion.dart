@@ -356,6 +356,8 @@ class DiscussionModel {
           other.author.consecutiveCheckInDays ?? author.consecutiveCheckInDays
       ..canCheckIn = other.author.canCheckIn;
     likesCount = other.likesCount;
+    commentsCount = other.commentsCount;
+    views = other.views;
     liked = other.liked;
     isEditableDraft = other.isEditableDraft;
     hasPublishedVersion = other.hasPublishedVersion;
