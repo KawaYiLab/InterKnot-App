@@ -47,6 +47,8 @@ class HDataModel {
   bool isPinned;
   bool isEditableDraft;
   bool hasPublishedVersion;
+  bool isAnonymous;
+  PostCategory? category;
   bool get isPin => isPinned;
   String get url => '';
 
@@ -62,6 +64,8 @@ class HDataModel {
     required this.isPinned,
     this.isEditableDraft = false,
     this.hasPublishedVersion = false,
+    this.isAnonymous = false,
+    this.category,
   })  : updatedAt = updatedAt ?? _zeroDate,
         createdAt = createdAt ?? _zeroDate;
 
@@ -109,6 +113,15 @@ class HDataModel {
         json['id']?.toString() ??
         json['number']?.toString() ??
         '';
+    final categoryRaw = json['category'];
+    PostCategory? category;
+    if (categoryRaw is Map) {
+      final name = categoryRaw['name']?.toString() ?? '';
+      final slug = categoryRaw['slug']?.toString() ?? '';
+      if (name.isNotEmpty || slug.isNotEmpty) {
+        category = PostCategory(name: name, slug: slug);
+      }
+    }
 
     final updatedAt =
         (json['updatedAt'] as String?).use((v) => DateTime.parse(v));
@@ -123,6 +136,8 @@ class HDataModel {
       isPinned: false,
       isEditableDraft: isEditableDraft,
       hasPublishedVersion: json['hasPublishedVersion'] == true,
+      isAnonymous: json['isAnonymous'] == true,
+      category: category,
     );
   }
 
@@ -172,6 +187,13 @@ class HDataModel {
       createdAt: createdAt,
       isPinned: true,
       hasPublishedVersion: json['hasPublishedVersion'] == true,
+      isAnonymous: json['isAnonymous'] == true,
+      category: json['category'] is Map
+          ? PostCategory(
+              name: json['category']['name']?.toString() ?? '',
+              slug: json['category']['slug']?.toString() ?? '',
+            )
+          : null,
     );
   }
 
@@ -195,6 +217,12 @@ class HDataModel {
       'isPinned': isPinned,
       'isEditableDraft': isEditableDraft,
       'hasPublishedVersion': hasPublishedVersion,
+      'isAnonymous': isAnonymous,
+      if (category != null)
+        'category': {
+          'name': category!.name,
+          'slug': category!.slug,
+        },
       // We might want to cache title/cover for offline display if available in valueCache
       if (_valueCache.containsKey(id)) ..._valueCache[id]!.toJson(),
     };

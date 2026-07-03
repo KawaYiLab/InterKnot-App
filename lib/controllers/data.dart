@@ -464,6 +464,10 @@ class Controller extends GetxController {
     final token = getToken();
     if (token.isNotEmpty) {
       try {
+        final renewedToken = await api.renewToken();
+        if (renewedToken != null && renewedToken.isNotEmpty) {
+          await setToken(renewedToken);
+        }
         await refreshSelfUserInfo(rethrowOnError: true);
         isLogin(true);
         await refreshFavorites();
@@ -473,33 +477,6 @@ class Controller extends GetxController {
           await _clearStoredSession();
         } else {
           logger.e('Failed to get user info', error: e);
-        }
-      }
-    } else {
-      // Check for pending activation credentials
-      final pendingEmail = box.read<String>('pending_activation_email');
-      final pendingPassword = box.read<String>('pending_activation_password');
-      if (pendingEmail != null && pendingPassword != null) {
-        // Try to login silently
-        try {
-          final res =
-              await BaseConnect.authApi.login(pendingEmail, pendingPassword);
-          if (res.token != null) {
-            await setToken(res.token!);
-            user(res.user);
-            await ensureAuthorForUser(res.user);
-            isLogin(true);
-            await refreshSelfUserInfo(rethrowOnError: true);
-            await refreshFavorites();
-            await refreshUnreadNotificationCount();
-            // Clear pending credentials
-            box.remove('pending_activation_email');
-            box.remove('pending_activation_password');
-            showToast('登录成功：欢迎回来，绳匠！');
-          }
-        } catch (e) {
-          // Ignore failures, user will see waiting screen in LoginPage if they go there
-          logger.w('Auto-login from pending activation failed: $e');
         }
       }
     }

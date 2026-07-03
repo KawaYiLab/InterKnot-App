@@ -33,6 +33,9 @@ class AuthorModel {
   }) : name = name ?? login;
 
   static String? extractAvatarUrl(dynamic avatarData) {
+    if (avatarData is String) {
+      return avatarData;
+    }
     if (avatarData is! Map) return null;
 
     final directUrl = avatarData['url'] as String?;
@@ -66,6 +69,17 @@ class AuthorModel {
     return null;
   }
 
+  static String? _normalizeAvatarUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    if (url.startsWith('/')) {
+      return '$_baseUrl$url';
+    }
+    return '$_baseUrl/$url';
+  }
+
   factory AuthorModel.fromJson(Map<String, dynamic> json) {
     final authorData = json['author'];
     final authorMap = authorData is Map<String, dynamic> ? authorData : null;
@@ -82,9 +96,7 @@ class AuthorModel {
         (authorAttributes is Map ? authorAttributes['avatar'] : null);
     String? avatarUrl = extractAvatarUrl(avatarData);
 
-    if (avatarUrl != null && !avatarUrl.startsWith('http')) {
-      avatarUrl = '$_baseUrl$avatarUrl';
-    }
+    avatarUrl = _normalizeAvatarUrl(avatarUrl);
 
     final username = json['username'] as String?;
     final userId = json['id']?.toString();
