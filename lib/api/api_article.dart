@@ -369,6 +369,7 @@ extension ArticleApi on Api {
     List<dynamic>? editorState,
     dynamic coverId,
     String? authorId,
+    String? categorySlug,
   }) {
     final Map<String, dynamic> data = {
       'title': title,
@@ -383,6 +384,9 @@ extension ArticleApi on Api {
 
     if (authorId != null && authorId.isNotEmpty) {
       data['author'] = _coerceId(authorId);
+    }
+    if (categorySlug != null) {
+      data['category'] = categorySlug;
     }
 
     return post(
@@ -400,6 +404,7 @@ extension ArticleApi on Api {
     List<dynamic>? editorState,
     dynamic coverId,
     String? authorId,
+    String? categorySlug,
   }) {
     final Map<String, dynamic> data = {};
     if (title != null) data['title'] = title;
@@ -413,6 +418,9 @@ extension ArticleApi on Api {
     }
     if (authorId != null && authorId.isNotEmpty) {
       data['author'] = _coerceId(authorId);
+    }
+    if (categorySlug != null) {
+      data['category'] = categorySlug;
     }
 
     return put(

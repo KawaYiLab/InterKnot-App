@@ -87,6 +87,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   bool _isDesktopEditorActive = true;
   late final bool _draftFeaturesEnabled;
   String? _documentId;
+  String? _selectedCategorySlug;
   String _lastSavedSnapshot = '';
   List<dynamic>? _persistedEditorState;
   String _persistedBodyText = '';
@@ -184,6 +185,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       'text': _currentBodyText,
       'editorState': _currentEditorState,
       'cover': _currentCoverPayload,
+      'category': _selectedCategorySlug,
     };
   }
 
@@ -254,6 +256,12 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     if (_isDesktopEditorActive) {
       _markDraftDirty();
     }
+  }
+
+  void _onCategorySelected(String? slug) {
+    if (_selectedCategorySlug == slug) return;
+    setState(() => _selectedCategorySlug = slug);
+    _markDraftDirty();
   }
 
   bool _isAllowedImageFilename(String filename) {
@@ -902,6 +910,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
           editorState: payload['editorState'] as List<dynamic>?,
           coverId: payload['cover'],
           authorId: authorId,
+          categorySlug: _selectedCategorySlug,
         );
       } else {
         res = await api.updateArticleDraft(
@@ -911,6 +920,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
           editorState: payload['editorState'] as List<dynamic>?,
           coverId: payload['cover'],
           authorId: authorId,
+          categorySlug: _selectedCategorySlug,
         );
       }
 
@@ -967,6 +977,10 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     try {
       _setCurrentDiscussion(discussion);
       titleController.text = discussion.title;
+      _selectedCategorySlug =
+          (discussion.category?.slug.isNotEmpty ?? false)
+              ? discussion.category!.slug
+              : null;
       _mobileBodyController.text = discussion.rawBodyText;
 
       try {
@@ -1155,6 +1169,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     titleController.addListener(_handleTitleChanged);
     _mobileBodyController.addListener(_handleMobileBodyChanged);
     _quillController.addListener(_handleQuillChanged);
+    unawaited(c.loadCategories());
 
     if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
@@ -1283,6 +1298,8 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       titleController: titleController,
       quillController: _quillController,
       onPickAndUploadImage: _pickAndUploadImage,
+      selectedCategorySlug: _selectedCategorySlug,
+      onCategorySelected: _onCategorySelected,
       isMobile: true,
       mobileBodyController: _mobileBodyController,
       mobileUploadTasks: _uploadTasks,
@@ -1310,6 +1327,8 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
         titleController: titleController,
         quillController: _quillController,
         onPickAndUploadImage: _pickAndUploadImage,
+        selectedCategorySlug: _selectedCategorySlug,
+        onCategorySelected: _onCategorySelected,
       ),
       CreateDiscussionCoverPage(
         uploadTasks: _uploadTasks,

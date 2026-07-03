@@ -9,6 +9,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/components/image_viewer.dart';
+import 'package:inter_knot/components/category_selector.dart';
 import 'package:inter_knot/helpers/markdown_import.dart';
 import 'package:inter_knot/helpers/upload_task.dart';
 
@@ -18,6 +19,8 @@ class CreateDiscussionEditorPage extends StatelessWidget {
     required this.titleController,
     required this.quillController,
     required this.onPickAndUploadImage,
+    required this.selectedCategorySlug,
+    required this.onCategorySelected,
     this.isMobile = false,
     this.mobileBodyController,
     this.mobileUploadTasks,
@@ -32,6 +35,8 @@ class CreateDiscussionEditorPage extends StatelessWidget {
   final TextEditingController titleController;
   final quill.QuillController quillController;
   final VoidCallback onPickAndUploadImage;
+  final String? selectedCategorySlug;
+  final ValueChanged<String?> onCategorySelected;
 
   final bool isMobile;
   final TextEditingController? mobileBodyController;
@@ -54,6 +59,8 @@ class CreateDiscussionEditorPage extends StatelessWidget {
         onRetryImage: onRetryMobileImage!,
         onPickCoverImages: onPickCoverImages!,
         onOpenPostSettings: onOpenPostSettings!,
+        selectedCategorySlug: selectedCategorySlug,
+        onCategorySelected: onCategorySelected,
         compressBeforeUpload: mobileCompressBeforeUpload,
         maxCoverImages: mobileMaxCoverImages,
       );
@@ -63,6 +70,8 @@ class CreateDiscussionEditorPage extends StatelessWidget {
       titleController: titleController,
       quillController: quillController,
       onPickAndUploadImage: onPickAndUploadImage,
+      selectedCategorySlug: selectedCategorySlug,
+      onCategorySelected: onCategorySelected,
     );
   }
 }
@@ -72,11 +81,15 @@ class _DesktopEditorBody extends StatefulWidget {
     required this.titleController,
     required this.quillController,
     required this.onPickAndUploadImage,
+    required this.selectedCategorySlug,
+    required this.onCategorySelected,
   });
 
   final TextEditingController titleController;
   final quill.QuillController quillController;
   final VoidCallback onPickAndUploadImage;
+  final String? selectedCategorySlug;
+  final ValueChanged<String?> onCategorySelected;
 
   @override
   State<_DesktopEditorBody> createState() => _DesktopEditorBodyState();
@@ -155,6 +168,11 @@ class _DesktopEditorBodyState extends State<_DesktopEditorBody> {
           ),
         ),
         const SizedBox(height: 16),
+        CategorySelector(
+          selectedCategorySlug: widget.selectedCategorySlug,
+          onCategorySelected: widget.onCategorySelected,
+        ),
+        const SizedBox(height: 16),
         quill.QuillSimpleToolbar(
           controller: widget.quillController,
           config: quill.QuillSimpleToolbarConfig(
@@ -219,6 +237,8 @@ class _MobileEditorBody extends StatefulWidget {
     required this.onRetryImage,
     required this.onPickCoverImages,
     required this.onOpenPostSettings,
+    required this.selectedCategorySlug,
+    required this.onCategorySelected,
     required this.compressBeforeUpload,
     required this.maxCoverImages,
   });
@@ -230,6 +250,8 @@ class _MobileEditorBody extends StatefulWidget {
   final void Function(UploadTask task) onRetryImage;
   final VoidCallback onPickCoverImages;
   final VoidCallback onOpenPostSettings;
+  final String? selectedCategorySlug;
+  final ValueChanged<String?> onCategorySelected;
   final bool compressBeforeUpload;
   final int maxCoverImages;
 
@@ -274,6 +296,14 @@ class _MobileEditorBodyState extends State<_MobileEditorBody> {
             ),
             border: InputBorder.none,
             contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: CategorySelector(
+            selectedCategorySlug: widget.selectedCategorySlug,
+            onCategorySelected: widget.onCategorySelected,
           ),
         ),
         const Divider(height: 1, color: Color(0xff2A2A2A)),
