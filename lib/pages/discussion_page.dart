@@ -181,36 +181,23 @@ class _DiscussionPageState extends State<DiscussionPage> {
   }
 
   Future<void> _checkNewComments({bool syncOnly = false}) async {
-    try {
-      final count = await Get.find<Api>().getCommentCount(widget.discussion.id);
-      if (syncOnly) {
-        final shouldRefresh = count != widget.discussion.commentsCount;
-        widget.discussion.commentsCount = count;
-        if (_newCommentCounts.value.newCount > 0) {
-          _newCommentCounts.value =
-              const NewCommentCounts(newCount: 0, serverCount: 0);
-        }
-        if (shouldRefresh && mounted) {
-          setState(() {});
-        }
-        return;
+    final count = widget.discussion.commentsCount;
+    if (syncOnly) {
+      if (_newCommentCounts.value.newCount > 0) {
+        _newCommentCounts.value =
+            const NewCommentCounts(newCount: 0, serverCount: 0);
       }
+      return;
+    }
 
-      if (count > widget.discussion.commentsCount) {
-        _newCommentCounts.value = NewCommentCounts(
-          newCount: count - widget.discussion.commentsCount,
-          serverCount: count,
-        );
-      } else {
-        // If server count is less or equal (e.g. deletion), sync it?
-        // Or just ignore.
-        if (_newCommentCounts.value.newCount > 0) {
-          _newCommentCounts.value =
-              const NewCommentCounts(newCount: 0, serverCount: 0);
-        }
-      }
-    } catch (e) {
-      // ignore
+    if (count > widget.discussion.commentsCount) {
+      _newCommentCounts.value = NewCommentCounts(
+        newCount: count - widget.discussion.commentsCount,
+        serverCount: count,
+      );
+    } else if (_newCommentCounts.value.newCount > 0) {
+      _newCommentCounts.value =
+          const NewCommentCounts(newCount: 0, serverCount: 0);
     }
   }
 

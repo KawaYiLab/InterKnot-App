@@ -1,85 +1,38 @@
 import 'package:get/get.dart';
-import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/models/captcha.dart';
-import 'package:inter_knot/services/captcha_bridge.dart';
 
 class CaptchaService extends GetxService {
   final config = CaptchaConfigModel.disabled().obs;
 
-  bool _hasLoadedConfig = false;
-  bool _lastLoadFailed = false;
-
-  Api get _api => Get.find<Api>();
-
   Future<CaptchaService> init() async {
-    try {
-      await refreshConfig();
-    } catch (_) {}
+    config.value = CaptchaConfigModel.disabled();
     return this;
   }
 
   Future<CaptchaConfigModel> refreshConfig() async {
-    try {
-      final nextConfig = await _api.getCaptchaConfig();
-      config.value = nextConfig;
-      _hasLoadedConfig = true;
-      _lastLoadFailed = false;
-      return nextConfig;
-    } catch (_) {
-      _lastLoadFailed = true;
-      rethrow;
-    }
+    final nextConfig = CaptchaConfigModel.disabled();
+    config.value = nextConfig;
+    return nextConfig;
   }
 
   Future<CaptchaConfigModel> ensureConfigLoaded() async {
-    if (!_hasLoadedConfig || _lastLoadFailed) {
-      return refreshConfig();
-    }
     return config.value;
   }
 
   Future<CaptchaPayload?> verifyIfNeeded(CaptchaScene scene) async {
-    final currentConfig = await ensureConfigLoaded();
-    if (!currentConfig.isSceneEnabled(scene)) {
-      return null;
-    }
-    if (currentConfig.captchaId.isEmpty) {
-      throw ApiException('验证码配置缺失');
-    }
-    return runCaptchaVerification(currentConfig.captchaId);
+    return null;
   }
 
   Future<CaptchaPayload?> verifyForArticlePublish() async {
-    final currentConfig = await ensureConfigLoaded();
-    final shouldVerify =
-        currentConfig.isSceneEnabled(CaptchaScene.articlePublish) ||
-            currentConfig.isSceneEnabled(CaptchaScene.articleCreate);
-    if (!shouldVerify) {
-      return null;
-    }
-    if (currentConfig.captchaId.isEmpty) {
-      throw ApiException('验证码配置缺失');
-    }
-    return runCaptchaVerification(currentConfig.captchaId);
+    return null;
   }
 
-  Future<CaptchaPayload> verifyForRequiredResponse({
+  Future<CaptchaPayload?> verifyForRequiredResponse({
     required CaptchaScene fallbackScene,
     dynamic body,
   }) async {
-    final currentConfig = await ensureConfigLoaded();
-    if (!currentConfig.enabled || currentConfig.captchaId.isEmpty) {
-      throw ApiException('验证码配置缺失');
-    }
-
-    final details = extractErrorDetails(body);
-    final scene = parseScene(details?['scene']) ?? fallbackScene;
-    if (!currentConfig.isSceneEnabled(scene) && !currentConfig.enabled) {
-      throw ApiException('验证码配置缺失');
-    }
-
-    return runCaptchaVerification(currentConfig.captchaId);
+    return null;
   }
 
   static String? extractErrorCode(dynamic body) {

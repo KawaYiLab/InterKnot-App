@@ -25,6 +25,16 @@ class CoverImage {
   });
 }
 
+class PostCategory {
+  final String name;
+  final String slug;
+
+  const PostCategory({
+    required this.name,
+    required this.slug,
+  });
+}
+
 DiscussionModel parseDiscussionData(
   Map<String, dynamic> json, {
   bool isEditableDraft = false,
@@ -58,6 +68,14 @@ DiscussionModel parseDiscussionData(
 
   final (:cover, :html) = parseHtml(htmlBody);
   final List<CoverImage> parsedCovers = [];
+
+  PostCategory? parseCategory(dynamic raw) {
+    if (raw is! Map) return null;
+    final name = raw['name']?.toString() ?? '';
+    final slug = raw['slug']?.toString() ?? '';
+    if (name.isEmpty && slug.isEmpty) return null;
+    return PostCategory(name: name, slug: slug);
+  }
 
   CoverImage? normalizeCover(
     String? url,
@@ -112,6 +130,15 @@ DiscussionModel parseDiscussionData(
       id: coverData['documentId']?.toString() ?? coverData['id']?.toString(),
     );
     if (cover != null) parsedCovers.add(cover);
+  } else if (coverData is String && coverData.isNotEmpty) {
+    final width = parseDimension(json['coverWidth']);
+    final height = parseDimension(json['coverHeight']);
+    final cover = normalizeCover(
+      coverData,
+      width,
+      height,
+    );
+    if (cover != null) parsedCovers.add(cover);
   }
 
   final List<CoverImage> covers = [];
@@ -141,6 +168,7 @@ DiscussionModel parseDiscussionData(
           avatar: '',
           name: 'Unknown',
         );
+  final category = parseCategory(json['category']);
 
   // Pre-calculate bodyText here to avoid regex overhead during rendering
   var bodyText =
@@ -190,6 +218,8 @@ DiscussionModel parseDiscussionData(
     liked: json['liked'] == true,
     isRead: json['isRead'] == true,
     isPinned: json['isPinned'] == true,
+    isAnonymous: json['isAnonymous'] == true,
+    category: category,
     isEditableDraft: isEditableDraft,
     hasPublishedVersion: hasPublishedVersion,
     comments: commentsJson != null
@@ -229,6 +259,8 @@ class DiscussionModel {
   bool liked;
   bool isEditableDraft;
   bool hasPublishedVersion;
+  bool isAnonymous;
+  PostCategory? category;
   AuthorModel author;
   List<PaginationModel<CommentModel>> comments;
 
@@ -291,6 +323,8 @@ class DiscussionModel {
     liked = other.liked;
     isEditableDraft = other.isEditableDraft;
     hasPublishedVersion = other.hasPublishedVersion;
+    isAnonymous = other.isAnonymous;
+    category = other.category;
     // updated fields from detail api
   }
 
@@ -340,6 +374,8 @@ class DiscussionModel {
     this.liked = false,
     this.isEditableDraft = false,
     this.hasPublishedVersion = false,
+    this.isAnonymous = false,
+    this.category,
     required this.lastEditedAt,
     required this.author,
     this.isRead = false,
@@ -390,6 +426,12 @@ class DiscussionModel {
       'likescount': likesCount,
       'liked': liked,
       'hasPublishedVersion': hasPublishedVersion,
+      'isAnonymous': isAnonymous,
+      if (category != null)
+        'category': {
+          'name': category!.name,
+          'slug': category!.slug,
+        },
       'isEditableDraft': isEditableDraft,
       'author': author.toJson(),
     };

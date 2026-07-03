@@ -37,48 +37,20 @@ class AuthApi extends GetConnect {
     httpClient.defaultContentType = 'application/json';
   }
 
-  String _getErrorMessage(Response res) {
-    String msg = res.statusText ?? 'Request failed';
-    if (msg.contains('XMLHttpRequest error')) {
-      return '短时间内请求数量过多';
-    }
-    try {
-      if (res.body is Map && res.body['error'] != null) {
-        final error = res.body['error'];
-        if (error is Map) {
-          msg = _captchaErrorMessage(error['code']?.toString()) ??
-              error['message']?.toString() ??
-              msg;
-        } else if (error is String) {
-          msg = error;
-        }
-      }
-    } catch (_) {}
-    return msg;
-  }
-
-  Map<String, dynamic> _withCaptcha(
-    Map<String, dynamic> payload,
-    CaptchaPayload? captcha,
-  ) {
-    if (captcha == null) return payload;
-    return {
-      ...payload,
-      'captcha': captcha.toJson(),
-    };
-  }
-
   Future<({String? token, AuthorModel user})> login(
       String email, String password,
       {CaptchaPayload? captcha}) async {
     final res = await post(
-      captcha == null ? '/api/auth/local' : '/api/auth/local-with-captcha',
-      _withCaptcha({'identifier': email, 'password': password}, captcha),
+      '/api/auth/local',
+      {'identifier': email, 'password': password},
     );
 
     if (res.hasError) {
       debugPrint('Login Error: ${res.statusCode} - ${res.bodyString}');
-      throw ApiException(_getErrorMessage(res), statusCode: res.statusCode);
+      throw ApiException(
+        res.statusText ?? 'Request failed',
+        statusCode: res.statusCode,
+      );
     }
 
     final body = res.body as Map<String, dynamic>;
@@ -88,22 +60,26 @@ class AuthApi extends GetConnect {
     );
   }
 
-  Future<({String? token, AuthorModel user})> register(
-      String username, String email, String password,
-      {CaptchaPayload? captcha}) async {
+  Future<Response> sendRegisterCode(String email) {
+    return post('/api/auth/send-register-code', {'email': email});
+  }
+
+  Future<({String? token, AuthorModel user})> registerWithCode(
+    String email,
+    String code,
+    String password,
+  ) async {
     final res = await post(
-      captcha == null
-          ? '/api/auth/local/register'
-          : '/api/auth/register-with-captcha',
-      _withCaptcha(
-        {'username': username, 'email': email, 'password': password},
-        captcha,
-      ),
+      '/api/auth/register-with-code',
+      {'email': email, 'code': code, 'password': password},
     );
 
     if (res.hasError) {
       debugPrint('Register Error: ${res.statusCode} - ${res.bodyString}');
-      throw ApiException(_getErrorMessage(res), statusCode: res.statusCode);
+      throw ApiException(
+        res.statusText ?? 'Request failed',
+        statusCode: res.statusCode,
+      );
     }
 
     final body = res.body as Map<String, dynamic>;
@@ -111,6 +87,22 @@ class AuthApi extends GetConnect {
       token: body['jwt'] as String?,
       user: AuthorModel.fromJson(body['user'] as Map<String, dynamic>)
     );
+  }
+
+  Future<Response> sendResetCode(String email) {
+    return post('/api/auth/send-reset-code', {'email': email});
+  }
+
+  Future<Response> resetPassword(
+    String email,
+    String code,
+    String password,
+  ) {
+    return post('/api/auth/reset-password', {
+      'email': email,
+      'code': code,
+      'password': password,
+    });
   }
 }
 
@@ -137,7 +129,7 @@ class BaseConnect extends GetConnect {
       final isPublicEndpoint =
           (path.startsWith('/api/articles') && !path.contains('/my')) ||
               (path.startsWith('/api/comments') && !path.contains('/likes')) ||
-              path.startsWith('/api/authors');
+              path.startsWith('/api/profiles');
 
       // Only attach token if it exists AND (it's not a GET request OR it's not a public endpoint)
       // This ensures POST/PUT/DELETE always get auth, but GET public data stays anonymous for caching
@@ -453,6 +445,20 @@ class Api extends BaseConnect {
     final res = await get('/api/captcha/config');
     final body = unwrapData<Map<String, dynamic>>(res);
     return CaptchaConfigModel.fromJson(body);
+  }
+
+  Future<String?> renewToken() async {
+    final res = await post('/api/auth/renew', {});
+    if (res.hasError) {
+      debugPrint('Renew Error: ${res.statusCode} - ${res.bodyString}');
+      throw ApiException(
+        res.statusText ?? 'Request failed',
+        statusCode: res.statusCode,
+      );
+    }
+
+    final body = res.body as Map<String, dynamic>;
+    return body['jwt'] as String?;
   }
 
   String _slugify(String input, {bool ensureUnique = false}) {
@@ -868,23 +874,6 @@ class Api extends BaseConnect {
           return pagination['total'] as int? ?? 0;
         }
       }
-    }
-    return 0;
-  }
-
-  Future<int> getCommentCount(String discussionId) async {
-    final res = await get(
-      '/api/comments/count',
-      query: {
-        'article': discussionId,
-      },
-    );
-
-    if (res.hasError) return 0;
-
-    final body = res.body;
-    if (body is Map<String, dynamic>) {
-      return body['count'] as int? ?? 0;
     }
     return 0;
   }
@@ -1358,34 +1347,28 @@ class Api extends BaseConnect {
   }
 
   Future<AuthorModel> getUserInfo(String username) async {
-    // We need to search for the user by username
     final res = await get(
-      '/api/users',
-      query: {
-        'filters[username][\$eq]': username,
-        'populate': '*',
-      },
+      '/api/profiles/$username',
+      query: {'populate': '*'},
     );
 
-    final list = unwrapData<List<dynamic>>(res);
-    if (list.isEmpty) throw ApiException('User not found');
-
-    final user = AuthorModel.fromJson(list.first as Map<String, dynamic>);
+    final body = unwrapData<Map<String, dynamic>>(res);
+    final user = AuthorModel.fromJson(body);
     await _fetchAndSetAvatar(user);
     return user;
   }
 
   Future<String?> getAuthorAvatarUrl(String authorId) async {
     final res = await get(
-      '/api/authors/$authorId',
+      '/api/profiles/$authorId',
       query: {'populate': 'avatar'},
     );
-    final authorData = unwrapData<Map<String, dynamic>>(res);
-    String? url = AuthorModel.extractAvatarUrl(authorData['avatar']);
-    if (url != null && !url.startsWith('http')) {
-      url = '${ApiConfig.baseUrl}$url';
-    }
-    return url;
+    final profileData = unwrapData<Map<String, dynamic>>(res);
+    final url = AuthorModel.extractAvatarUrl(profileData['avatar']);
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '${ApiConfig.baseUrl}$url';
+    return '${ApiConfig.baseUrl}/$url';
   }
 
   Future<void> markAsRead(String articleId) async {
