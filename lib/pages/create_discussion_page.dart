@@ -910,7 +910,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
           editorState: payload['editorState'] as List<dynamic>?,
           coverId: payload['cover'],
           authorId: authorId,
-          categorySlug: _selectedCategorySlug,
+          categorySlug: payload['category'] as String?,
         );
       } else {
         res = await api.updateArticleDraft(
@@ -920,7 +920,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
           editorState: payload['editorState'] as List<dynamic>?,
           coverId: payload['cover'],
           authorId: authorId,
-          categorySlug: _selectedCategorySlug,
+          categorySlug: payload['category'] as String?,
         );
       }
 
@@ -1169,7 +1169,10 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     titleController.addListener(_handleTitleChanged);
     _mobileBodyController.addListener(_handleMobileBodyChanged);
     _quillController.addListener(_handleQuillChanged);
-    unawaited(c.loadCategories());
+    // 分区列表通常已在 Controller.onInit 拉过；仅在为空（如首次拉取失败）时补拉。
+    if (c.categories.isEmpty) {
+      unawaited(c.loadCategories());
+    }
 
     if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
