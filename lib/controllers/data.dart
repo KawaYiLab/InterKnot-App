@@ -13,6 +13,7 @@ import 'package:inter_knot/helpers/num2dur.dart';
 import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
@@ -29,6 +30,10 @@ class Controller extends GetxController {
 
   final searchQuery = ''.obs;
   final searchResult = <HDataModel>{}.obs; // HData -> HDataModel
+  // 频道/分区：categories 为可选的 tab 列表，selectedCategorySlug 为当前过滤项
+  // （空字符串代表「全部」，不过滤）。
+  final categories = <CategoryModel>[].obs;
+  final selectedCategorySlug = ''.obs;
   // Persistent storage key for offline cache
   static const String _searchCacheKey = 'offline_search_cache';
   String? searchEndCur;
@@ -540,6 +545,9 @@ class Controller extends GetxController {
       }
     }
 
+    // 频道列表并行加载，不阻塞首页首屏。
+    unawaited(loadCategories());
+
     try {
       await searchData();
     } catch (e) {
@@ -595,7 +603,8 @@ class Controller extends GetxController {
     if (isSearching.value) return;
 
     try {
-      final pagination = await api.search('', '');
+      final pagination =
+          await api.search('', '', categorySlug: selectedCategorySlug.value);
 
       // Check again if we started searching while waiting for api
       if (isSearching.value) return;
@@ -649,7 +658,8 @@ class Controller extends GetxController {
     _startNewPostCheck();
     isSearching(true);
     try {
-      final pagination = await api.search('', '');
+      final pagination =
+          await api.search('', '', categorySlug: selectedCategorySlug.value);
       final existingIds = searchResult.map((e) => e.id).toSet();
       final inserted = pagination.nodes
           .where((e) => e.id.isNotEmpty && !existingIds.contains(e.id))
@@ -815,6 +825,23 @@ class Controller extends GetxController {
     }
   }, Duration.zero);
 
+  /// 拉取频道列表（尽力而为，失败不影响首页）。
+  Future<void> loadCategories() async {
+    try {
+      final list = await api.getCategories();
+      if (list.isNotEmpty) categories.assignAll(list);
+    } catch (e) {
+      logger.w('Failed to load categories: $e');
+    }
+  }
+
+  /// 切换当前频道过滤项并刷新首页。空 slug 代表「全部」。
+  Future<void> selectCategory(String slug) async {
+    if (selectedCategorySlug.value == slug) return;
+    selectedCategorySlug.value = slug;
+    await refreshSearchData();
+  }
+
   final searchCache = <String?>{};
   Future<void> searchData() async {
     if (searchHasNextPage.isFalse || searchCache.contains(searchEndCur)) return;
@@ -822,7 +849,11 @@ class Controller extends GetxController {
 
     final isFirstPage = searchEndCur == null || searchEndCur!.isEmpty;
 
-    final pagination = await api.search(searchQuery(), searchEndCur ?? '');
+    final pagination = await api.search(
+      searchQuery(),
+      searchEndCur ?? '',
+      categorySlug: selectedCategorySlug.value,
+    );
     // pagination returns PaginationModel<HDataModel>
     // destructure:
     searchEndCur = pagination.endCursor;
