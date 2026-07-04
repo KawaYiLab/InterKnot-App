@@ -206,6 +206,12 @@ class _ExamPageState extends State<ExamPage> {
 
   Future<void> _submit({bool auto = false}) async {
     if (_submitting || _attemptId == null || _attemptId!.isEmpty) return;
+
+    // 先占用提交锁，避免确认弹窗打开期间倒计时触发的自动交卷造成重复提交。
+    setState(() {
+      _submitting = true;
+    });
+
     if (!auto && _attempt != null && _answeredCount < _attempt!.questions.length) {
       final remain = _attempt!.questions.length - _answeredCount;
       final confirmed = await showDialog<bool>(
@@ -226,12 +232,16 @@ class _ExamPageState extends State<ExamPage> {
           ],
         ),
       );
-      if (confirmed != true) return;
+      if (confirmed != true) {
+        if (mounted) {
+          setState(() {
+            _submitting = false;
+          });
+        }
+        return;
+      }
     }
 
-    setState(() {
-      _submitting = true;
-    });
     try {
       final res = await api.submitExam(_attemptId!, _answers);
       if (!mounted) return;
