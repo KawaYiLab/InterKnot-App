@@ -7,7 +7,6 @@ import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/helpers/box.dart';
 import 'package:inter_knot/models/author.dart';
-import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
@@ -24,21 +23,15 @@ part 'api_interaction.dart';
 part 'api_profile.dart';
 part 'api_upload.dart';
 part 'api_notification.dart';
-
-String? _captchaErrorMessage(String? code) {
-  switch (code) {
-    case 'CAPTCHA_REQUIRED':
-      return '请先完成验证码验证';
-    case 'CAPTCHA_INVALID':
-      return '验证码未通过，请重试';
-    case 'CAPTCHA_VERIFY_FAILED':
-      return '验证码服务异常，请稍后重试';
-    case 'CAPTCHA_NOT_CONFIGURED':
-      return '验证码服务未配置完成，请稍后再试';
-    default:
-      return null;
-  }
-}
+part 'api_me.dart';
+part 'api_knock.dart';
+part 'api_dm.dart';
+part 'api_denny.dart';
+part 'api_follow.dart';
+part 'api_exam.dart';
+part 'api_emote.dart';
+part 'api_report.dart';
+part 'api_presence.dart';
 
 class AuthApi extends GetConnect {
   @override
@@ -256,8 +249,7 @@ class BaseConnect extends GetConnect {
       if (body is Map) {
         final error = body['error'];
         if (error is Map) {
-          message = _captchaErrorMessage(error['code']?.toString()) ??
-              error['message']?.toString();
+          message = error['message']?.toString();
         } else if (error is String) {
           message = error;
         }
@@ -364,17 +356,6 @@ class Api extends BaseConnect {
     return '${ApiConfig.baseUrl}$url';
   }
 
-  Map<String, dynamic> _withCaptcha(
-    Map<String, dynamic> payload,
-    CaptchaPayload? captcha,
-  ) {
-    if (captcha == null) return payload;
-    return {
-      ...payload,
-      'captcha': captcha.toJson(),
-    };
-  }
-
   String _contentTypeFromFilename(String filename) {
     final ext = filename.toLowerCase();
     if (ext.endsWith('.png')) return 'image/png';
@@ -382,23 +363,6 @@ class Api extends BaseConnect {
     if (ext.endsWith('.gif')) return 'image/gif';
     if (ext.endsWith('.bmp')) return 'image/bmp';
     return 'image/jpeg';
-  }
-
-  String _slugify(String input, {bool ensureUnique = false}) {
-    final normalized = input
-        .toLowerCase()
-        .trim()
-        .replaceAll(RegExp('[^a-z0-9]+'), '-')
-        .replaceAll(RegExp('-{2,}'), '-')
-        .replaceAll(RegExp(r'^-+|-+$'), '');
-    var slug = normalized.isEmpty ? 'author' : normalized;
-
-    if (ensureUnique) {
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      slug = '$slug-$timestamp';
-    }
-
-    return slug;
   }
 
   Object _coerceId(String value) {

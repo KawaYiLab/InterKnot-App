@@ -8,13 +8,11 @@ import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/profile_dialogs.dart';
-import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/pages/history_page.dart';
 import 'package:inter_knot/pages/liked_page.dart';
 import 'package:inter_knot/pages/my_discussions_page.dart';
 import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/components/update_dialog.dart';
-import 'package:inter_knot/services/captcha_service.dart';
 import 'package:inter_knot/services/update_service.dart';
 
 import 'package:inter_knot/pages/my_page_desktop.dart';
@@ -874,9 +872,7 @@ class _HomePageState extends State<HomePage>
                   : ElevatedButton(
                       onPressed: () async {
                         try {
-                          final captcha = await Get.find<CaptchaService>()
-                              .verifyIfNeeded(CaptchaScene.checkIn);
-                          final result = await api.checkIn(captcha: captcha);
+                          final result = await api.checkIn();
                           await c.refreshMyExp();
                           if (context.mounted) {
                             final rank = result.rank;
@@ -890,9 +886,7 @@ class _HomePageState extends State<HomePage>
                           if (context.mounted) {
                             String msg = e.toString();
                             if (e is ApiException) {
-                              msg = CaptchaService
-                                      .resolveErrorMessageFromException(e) ??
-                                  e.message;
+                              msg = e.message;
                               if (e.statusCode == 409) {
                                 final details = e.details;
                                 String? checkInDay;

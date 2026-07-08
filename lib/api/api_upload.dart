@@ -2,7 +2,6 @@ part of 'api.dart';
 
 extension UploadApi on Api {
   Future<String?> uploadAvatar({
-    required String authorId,
     required List<int> bytes,
     required String filename,
     String? contentType,
@@ -25,31 +24,28 @@ extension UploadApi on Api {
     }
     final uploadedUrl = _normalizeFileUrl(result['url'] as String?);
 
-    // Update Author with new avatar
+    // 后端统一的自定义头像入口（同时清空装备头像，扣除丁尼）
     final updateRes = await put(
-      '/api/authors/$authorId',
-      {
-        'data': {
-          'avatar': _coerceId(rawAvatarId.toString()),
-        },
-      },
+      '/api/me/avatars/upload-custom',
+      {'fileId': rawAvatarId},
     );
 
     if (updateRes.hasError) {
-      throw ApiException(updateRes.bodyString ??
-          updateRes.statusText ??
-          'Failed to bind avatar');
+      throw ApiException(
+        _errorMessageFromBody(updateRes.body) ??
+            updateRes.statusText ??
+            'Failed to bind avatar',
+        statusCode: updateRes.statusCode,
+      );
     }
 
-    if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
-      return uploadedUrl;
+    final body = updateRes.body;
+    if (body is Map) {
+      final avatar = body['avatar'];
+      final url = avatar is Map ? avatar['url']?.toString() : null;
+      if (url != null && url.isNotEmpty) return _normalizeFileUrl(url);
     }
-
-    try {
-      return await getAuthorAvatarUrl(authorId);
-    } catch (_) {
-      return null;
-    }
+    return uploadedUrl;
   }
 
   /// 直传图片到对象存储

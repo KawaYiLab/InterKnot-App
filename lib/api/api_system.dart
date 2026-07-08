@@ -1,13 +1,6 @@
 part of 'api.dart';
 
 extension SystemApi on Api {
-  Future<CaptchaConfigModel> getCaptchaConfig() async {
-    final res = await get('/api/captcha/config');
-    final body = unwrapData<Map<String, dynamic>>(res);
-    return CaptchaConfigModel.fromJson(body);
-  }
-
-
   Future<String?> renewToken() async {
     final res = await post('/api/auth/renew', {});
     if (res.hasError) {
@@ -65,11 +58,8 @@ extension SystemApi on Api {
         int? rank,
         int? currentExp,
         int? currentLevel,
-      })> checkIn({CaptchaPayload? captcha}) async {
-    final res = await post(
-      '/api/check-in',
-      captcha == null ? <String, dynamic>{} : {'captcha': captcha.toJson()},
-    );
+      })> checkIn() async {
+    final res = await post('/api/check-in', <String, dynamic>{});
 
     if (res.hasError) {
       String errorMessage = '签到失败';
@@ -80,10 +70,7 @@ extension SystemApi on Api {
           final code = error['code']?.toString();
           details = error['details'] ?? res.body;
 
-          final captchaMessage = _captchaErrorMessage(code);
-          if (captchaMessage != null) {
-            errorMessage = captchaMessage;
-          } else if (code == 'CHECK_IN_ALREADY_TODAY') {
+          if (code == 'CHECK_IN_ALREADY_TODAY') {
             errorMessage = '今日已签到';
           } else if (error['message'] == 'Already checked in today.') {
             // Backward compatibility for old backend message.

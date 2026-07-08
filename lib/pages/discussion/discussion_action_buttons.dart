@@ -7,11 +7,9 @@ import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
-import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/pages/create_discussion_page.dart';
-import 'package:inter_knot/services/captcha_service.dart';
 
 class DiscussionActionButtons extends StatefulWidget {
   const DiscussionActionButtons({
@@ -114,38 +112,19 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
         return;
       }
 
-      var res = await api.addDiscussionComment(
+      final res = await api.addDiscussionComment(
         widget.discussion.id,
         content,
         authorId: authorId,
         parentId: _parentId,
       );
 
-      if (res.hasError &&
-          CaptchaService.isCaptchaRequiredResponse(
-            res.body,
-            expectedScene: CaptchaScene.commentCreate,
-          )) {
-        final captcha =
-            await Get.find<CaptchaService>().verifyForRequiredResponse(
-          fallbackScene: CaptchaScene.commentCreate,
-          body: res.body,
-        );
-        res = await api.addDiscussionComment(
-          widget.discussion.id,
-          content,
-          authorId: authorId,
-          parentId: _parentId,
-          captcha: captcha,
-        );
-      }
-
       if (res.hasError) {
-        throw Exception(
-          CaptchaService.resolveErrorMessageFromBody(res.body) ??
-              res.statusText ??
-              'Unknown error',
-        );
+        final dynamic body = res.body;
+        final error = body is Map ? body['error'] : null;
+        final message =
+            error is Map ? error['message']?.toString() : null;
+        throw Exception(message ?? res.statusText ?? 'Unknown error');
       }
 
       if (res.body?['errors'] != null) {

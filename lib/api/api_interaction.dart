@@ -1,8 +1,8 @@
 part of 'api.dart';
 
 extension InteractionApi on Api {
-  Future<({List<HDataModel> items, Map<String, String> favoriteIds})>
-      getFavorites(String username, String endCur) async {
+  Future<({List<HDataModel> items})> getFavorites(
+      String username, String endCur) async {
     final start = int.tryParse(endCur.isEmpty ? '0' : endCur) ?? 0;
 
     final res = await get(
@@ -17,86 +17,83 @@ extension InteractionApi on Api {
     try {
       list = unwrapData<List<dynamic>>(res);
     } catch (e) {
-      return (items: <HDataModel>[], favoriteIds: <String, String>{});
+      return (items: <HDataModel>[]);
     }
 
     final items = <HDataModel>[];
-    final favoriteIds = <String, String>{};
 
     for (final entry in list) {
       if (entry is! Map) continue;
-      final favoriteId = entry['documentId']?.toString();
       final article = entry['article'];
 
       if (article is Map<String, dynamic>) {
         final hData = HDataModel.fromJson(article);
         if (hData.id.isNotEmpty) {
           items.add(hData);
-          if (favoriteId != null && favoriteId.isNotEmpty) {
-            favoriteIds[hData.id] = favoriteId;
-          }
         }
       }
     }
-    return (items: items, favoriteIds: favoriteIds);
+    return (items: items);
   }
 
 
-  Future<String?> getFavoriteId({
-    required String username,
-    required String articleId,
-  }) async {
-    final res = await get(
-      '/api/favorites',
-      query: {
-        'filters[user][username][\$eq]': username,
-        'filters[article][documentId][\$eq]': articleId,
-        'pagination[limit]': '1',
-      },
-    );
-
-    try {
-      final list = unwrapData<List<dynamic>>(res);
-      if (list.isNotEmpty) {
-        final first = list.first;
-        if (first is Map) {
-          return first['documentId']?.toString();
-        }
-      }
-    } catch (e) {
-      debugPrint('GetFavoriteId Error: $e');
-    }
-    return null;
-  }
-
-
-  Future<String?> createFavorite({
-    required String userId,
-    required String articleId,
-  }) async {
+  Future<({bool favorited, int favoritesCount})> toggleFavorite(
+      String articleId) async {
     final res = await post(
-      '/api/favorites',
-      {
-        'data': {
-          'user': _coerceId(userId),
-          'article': articleId,
-        },
-      },
+      '/api/favorites/toggle',
+      {'targetId': articleId},
     );
 
-    try {
-      final data = unwrapData<Map<String, dynamic>>(res);
-      return data['documentId']?.toString();
-    } catch (e) {
-      debugPrint('CreateFavorite Error: $e');
-      return null;
+    if (res.hasError) {
+      debugPrint('ToggleFavorite Error: ${res.statusCode} - ${res.bodyString}');
+      final body = res.body;
+      String msg = '收藏操作失败';
+      if (body is Map) {
+        final error = body['error'];
+        if (error is Map && error['message'] != null) {
+          msg = error['message'].toString();
+        }
+      }
+      throw ApiException(msg, statusCode: res.statusCode);
     }
+
+    final body = res.body;
+    if (body is Map<String, dynamic>) {
+      return (
+        favorited: body['favorited'] == true,
+        favoritesCount: (body['favoritesCount'] as num?)?.toInt() ?? 0,
+      );
+    }
+    throw ApiException('Invalid toggle favorite response');
   }
 
+  Future<Map<String, bool>> batchCheckFavorites(
+      List<String> targetIds) async {
+    if (targetIds.isEmpty) return {};
 
-  Future<bool> deleteFavorite(String favoriteId) async {
-    final res = await delete('/api/favorites/$favoriteId');
-    return !res.hasError;
+    final token = box.read<String>('access_token') ?? '';
+    if (token.isEmpty) return {};
+
+    final res = await get(
+      '/api/favorites/check',
+      query: {'targetIds': targetIds.join(',')},
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (res.hasError) {
+      debugPrint(
+          'BatchCheckFavorites Error: ${res.statusCode} - ${res.bodyString}');
+      return {};
+    }
+
+    final body = res.body;
+    if (body is Map<String, dynamic>) {
+      final data = body['data'];
+      if (data is Map) {
+        return data.map((k, v) => MapEntry(k.toString(), v == true));
+      }
+    }
+    return {};
   }
 
 

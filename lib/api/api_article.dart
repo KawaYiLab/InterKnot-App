@@ -433,12 +433,8 @@ extension ArticleApi on Api {
 
   Future<Response<Map<String, dynamic>>> publishArticleDraft({
     required String id,
-    CaptchaPayload? captcha,
   }) {
-    return post(
-      '/api/articles/$id/publish',
-      _withCaptcha(<String, dynamic>{}, captcha),
-    );
+    return post('/api/articles/$id/publish', <String, dynamic>{});
   }
 
 
