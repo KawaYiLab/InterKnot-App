@@ -5,12 +5,18 @@ extension InteractionApi on Api {
       String username, String endCur) async {
     final start = int.tryParse(endCur.isEmpty ? '0' : endCur) ?? 0;
 
+    // 收藏 feed 依赖登录态，需显式携带 token（GET /api/articles 默认匿名）。
+    final token = box.read<String>('access_token') ?? '';
+    if (token.isEmpty) return (items: <HDataModel>[]);
+
     final res = await get(
-      '/api/favorites/list',
+      '/api/articles/list',
       query: {
+        'feed': 'favorites',
         'start': start.toString(),
         'limit': ApiConfig.defaultPageSize.toString(),
       },
+      headers: {'Authorization': 'Bearer $token'},
     );
 
     List<dynamic> list;
@@ -23,14 +29,10 @@ extension InteractionApi on Api {
     final items = <HDataModel>[];
 
     for (final entry in list) {
-      if (entry is! Map) continue;
-      final article = entry['article'];
-
-      if (article is Map<String, dynamic>) {
-        final hData = HDataModel.fromJson(article);
-        if (hData.id.isNotEmpty) {
-          items.add(hData);
-        }
+      if (entry is! Map<String, dynamic>) continue;
+      final hData = HDataModel.fromJson(entry);
+      if (hData.id.isNotEmpty) {
+        items.add(hData);
       }
     }
     return (items: items);

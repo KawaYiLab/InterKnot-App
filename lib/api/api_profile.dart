@@ -9,7 +9,19 @@ extension ProfileApi on Api {
     );
 
     final data = unwrapData<Map<String, dynamic>>(res);
+    // /api/users/me 不带 author 关联，避免 fromJson 回退到 user documentId
+    data.remove('documentId');
     final user = AuthorModel.fromJson(data);
+    try {
+      final profile = await getMyProfile();
+      final author = profile['author'];
+      final id = author is Map ? author['documentId']?.toString() : null;
+      if (id != null && id.isNotEmpty) {
+        user.authorId = id;
+      }
+    } catch (_) {
+      // author 关联获取失败时保持为空，后续 ensureAuthorForUser 会重试。
+    }
     await _fetchAndSetAvatar(user);
     return user;
   }
