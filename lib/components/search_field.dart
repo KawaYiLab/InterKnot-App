@@ -37,10 +37,17 @@ class _SearchFieldState extends State<SearchField> {
   int _suggestSeq = 0;
   Completer<Iterable<SearchSuggestionModel>>? _pendingCompleter;
 
+  void _safeComplete(Iterable<SearchSuggestionModel> value) {
+    final p = _pendingCompleter;
+    if (p != null && !p.isCompleted) {
+      p.complete(value);
+    }
+  }
+
   @override
   void dispose() {
     _suggestDebounce?.cancel();
-    _pendingCompleter?.complete([]);
+    _safeComplete([]);
     _focusNode.dispose();
     super.dispose();
   }
@@ -50,7 +57,7 @@ class _SearchFieldState extends State<SearchField> {
   ) async {
     final query = value.text;
     if (query.isEmpty) {
-      _pendingCompleter?.complete([]);
+      _safeComplete([]);
       return c.searchHistory
           .map((k) => SearchSuggestionModel.history(k, query: k))
           .toList();
@@ -58,10 +65,7 @@ class _SearchFieldState extends State<SearchField> {
 
     final seq = ++_suggestSeq;
     _suggestDebounce?.cancel();
-    final previous = _pendingCompleter;
-    if (previous != null && !previous.isCompleted) {
-      previous.complete([]);
-    }
+    _safeComplete([]);
     final completer = Completer<Iterable<SearchSuggestionModel>>();
     _pendingCompleter = completer;
 
