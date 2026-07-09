@@ -280,8 +280,9 @@ class _SearchFieldState extends State<SearchField> {
           GestureDetector(
             onTap: () {
               c.removeSearchHistory(option.title);
-              // 移除后 Autocomplete 不会自动刷新选项，这里通过重建触发
-              if (mounted) setState(() {});
+              // 移除后通过重新触发 controller listener，让 Autocomplete 重新查询历史
+              final ctrl = c.searchController;
+              ctrl.value = ctrl.value;
             },
             child: const Icon(
               Icons.close,
