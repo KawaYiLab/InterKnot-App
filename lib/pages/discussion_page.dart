@@ -96,21 +96,26 @@ class _DiscussionPageState extends State<DiscussionPage> {
     _startNewCommentCheck();
     _fetchArticleDetails();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       final wasRead = widget.discussion.isRead;
-      int? serverViews;
-      try {
-        serverViews = await Get.find<Api>().viewArticle(widget.discussion.id);
-      } catch (e) {
-        logger.e('Failed to record article view', error: e);
-      }
-      c.markDiscussionReadAndViewed(
-        widget.discussion,
-        serverViews: serverViews,
-      );
+      // 先立即完成本地的已读 + 浏览量乐观更新，再异步同步服务端
+      c.markDiscussionReadAndViewed(widget.discussion);
       if (!wasRead) {
-        await Get.find<Api>().markAsRead(widget.discussion.id);
+        Get.find<Api>().markAsRead(widget.discussion.id);
       }
+      Get.find<Api>()
+          .viewArticle(widget.discussion.id)
+          .then((serverViews) {
+        if (serverViews != null) {
+          c.markDiscussionReadAndViewed(
+            widget.discussion,
+            serverViews: serverViews,
+          );
+        }
+      })
+          .catchError((e) {
+        logger.e('Failed to record article view', error: e);
+      });
     });
 
     scrollController.addListener(() {
