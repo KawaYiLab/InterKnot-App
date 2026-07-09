@@ -1052,7 +1052,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       }
     } catch (e) {
       debugPrint('Load draft failed: $e');
-      if (_activeDiscussion == null && mounted) {
+      if (mounted) {
         showToast('加载草稿失败: $e', isError: true);
       }
     } finally {
@@ -1138,6 +1138,8 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       return;
     }
 
+    _autoSaveDebounce?.cancel();
+
     final confirmed = await showDeleteConfirmDialog(
       context: context,
       title: '放弃修改',
@@ -1209,7 +1211,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       unawaited(c.loadCategories());
     }
 
-    if (_documentId == null && _activeDiscussion != null) {
+    if (_activeDiscussion != null) {
       _applyDiscussionToEditor(_activeDiscussion!);
     }
     unawaited(_loadDraftIfNeeded());
