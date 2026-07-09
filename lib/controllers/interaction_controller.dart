@@ -194,14 +194,9 @@ class InteractionController extends GetxController {
   Future<void> onInit() async {
     super.onInit();
 
-    if (_controller.isLogin.isTrue && _controller.user.value != null) {
-      unawaited(refreshFavorites());
-    }
-
-    ever(_controller.user, (u) {
-      if (u != null && _controller.isLogin.isTrue) {
-        unawaited(refreshFavorites());
-      } else {
+    // 跟随登录态整体切换即可；用户字段的日常刷新（如头像、等级）不应触发收藏刷新。
+    ever(_controller.isLogin, (v) {
+      if (!v) {
         bookmarks.clear();
       }
     });
