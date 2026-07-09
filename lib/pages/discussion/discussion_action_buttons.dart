@@ -163,6 +163,12 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       return;
     }
 
+    final failedUploads = _imageUploads.where((t) => t.error != null).toList();
+    if (failedUploads.isNotEmpty) {
+      showToast('有 ${failedUploads.length} 张图片上传失败，将不会包含在评论中',
+          isError: true);
+    }
+
     final user = c.user.value;
     final authorId = c.authorId.value ?? await c.ensureAuthorForUser(user);
     if (authorId == null || authorId.isEmpty) {
