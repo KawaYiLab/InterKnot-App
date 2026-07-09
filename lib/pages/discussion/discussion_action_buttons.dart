@@ -564,7 +564,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
 
   Widget _buildToolbar() {
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 2),
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
       child: Row(
         children: [
           ClickRegion(
@@ -600,7 +600,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: const Color(0xff222222),
                 borderRadius: BorderRadius.circular(maxRadius),

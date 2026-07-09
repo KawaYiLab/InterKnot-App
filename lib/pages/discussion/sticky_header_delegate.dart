@@ -12,17 +12,17 @@ class StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: const Color(0xff121212),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       alignment: Alignment.center,
       child: child,
     );
   }
 
   @override
-  double get maxExtent => 64.0;
+  double get maxExtent => 96.0;
 
   @override
-  double get minExtent => 64.0;
+  double get minExtent => 96.0;
 
   @override
   bool shouldRebuild(StickyHeaderDelegate oldDelegate) {
