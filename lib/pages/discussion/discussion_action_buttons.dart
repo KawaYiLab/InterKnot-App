@@ -56,6 +56,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
 
   bool _isWriting = false;
   bool _isLoading = false;
+  bool _isOverlayOpen = false;
   String? _parentId;
   String? _replyToUser;
   String? _replyToAuthorId;
@@ -265,11 +266,14 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   }
 
   Future<void> _openEmotePicker() async {
+    setState(() => _isOverlayOpen = true);
     final result = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => const EmotePicker(),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _isOverlayOpen = false);
+    });
     if (result == null || !mounted) return;
     _focusNode.requestFocus();
     if (result.startsWith('ik-')) {
@@ -280,18 +284,23 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   }
 
   Future<void> _openMentionPicker() async {
+    setState(() => _isOverlayOpen = true);
     final candidate = await showModalBottomSheet<MentionCandidateModel>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => const MentionSearchSheet(),
-    );
+    ).whenComplete(() {
+      if (mounted) setState(() => _isOverlayOpen = false);
+    });
     if (candidate == null || !mounted) return;
     _focusNode.requestFocus();
     _insertText(buildMentionToken(candidate.name, candidate.documentId));
   }
 
   Future<void> _pickImages() async {
+    setState(() => _isOverlayOpen = true);
     final picked = await _imagePicker.pickMultiImage();
+    if (mounted) setState(() => _isOverlayOpen = false);
     if (picked.isEmpty || !mounted) return;
 
     for (final xfile in picked) {
@@ -580,7 +589,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   Widget build(BuildContext context) {
     return TapRegion(
       onTapOutside: (_) {
-        if (_isWriting) _cancel();
+        if (_isWriting && !_isOverlayOpen) _cancel();
       },
       child: Row(
         children: [
@@ -635,6 +644,10 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                                                       LogicalKeyboardKey
                                                           .escape):
                                                   _cancel,
+                                              const SingleActivator(
+                                                LogicalKeyboardKey.enter,
+                                                control: true,
+                                              ): _submit,
                                             },
                                             child: TextField(
                                               controller: _textController,
