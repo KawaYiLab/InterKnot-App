@@ -225,6 +225,8 @@ class InteractionController extends GetxController {
     final oldHDataFavoritesCount = hData.favoritesCount;
     final oldDennyCount = discussion.dennyCount;
     final oldHasGivenDenny = discussion.hasGivenDenny;
+    final oldHDataDennyCount = hData.dennyCount;
+    final oldHDataHasGivenDenny = hData.hasGivenDenny;
 
     // 三连 = 点赞 + 收藏 + 投币（幂等/软失败）
     discussion.liked = true;
@@ -238,6 +240,10 @@ class InteractionController extends GetxController {
     if (!oldHasGivenDenny) {
       discussion.hasGivenDenny = true;
       discussion.dennyCount++;
+    }
+    if (!oldHDataHasGivenDenny) {
+      hData.hasGivenDenny = true;
+      hData.dennyCount++;
     }
 
     // 同步详情页缓存的 DiscussionModel
@@ -278,12 +284,16 @@ class InteractionController extends GetxController {
 
       if (result.coinGiven || result.coinReason == 'ALREADY_GIVEN') {
         discussion.hasGivenDenny = true;
+        hData.hasGivenDenny = true;
       } else {
         // 非 GIVEN / ALREADY_GIVEN 的 coinReason 均回滚本地投币状态
         discussion.hasGivenDenny = oldHasGivenDenny;
+        hData.hasGivenDenny = oldHDataHasGivenDenny;
         // 若此前未给过币，本地乐观 +1 需要回滚；已给过币则状态与后端一致。
         discussion.dennyCount =
             oldHasGivenDenny ? oldDennyCount : result.dennyCount;
+        hData.dennyCount =
+            oldHDataHasGivenDenny ? oldHDataDennyCount : result.dennyCount;
       }
 
       if (result.favorited) {
@@ -320,6 +330,8 @@ class InteractionController extends GetxController {
       hData.favoritesCount = oldHDataFavoritesCount;
       discussion.dennyCount = oldDennyCount;
       discussion.hasGivenDenny = oldHasGivenDenny;
+      hData.dennyCount = oldHDataDennyCount;
+      hData.hasGivenDenny = oldHDataHasGivenDenny;
 
       if (oldHDataFavorited) {
         if (!bookmarks.any((e) => e.id == articleId)) bookmarks.add(hData);
