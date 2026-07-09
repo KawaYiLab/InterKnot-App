@@ -14,7 +14,7 @@ import 'package:inter_knot/pages/discussion/discussion_desktop_body.dart';
 import 'package:inter_knot/pages/discussion/discussion_detail_box.dart';
 import 'package:inter_knot/pages/discussion/discussion_header_bar.dart';
 import 'package:inter_knot/pages/discussion/new_comment_notification.dart';
-import 'package:inter_knot/pages/discussion/sticky_header_delegate.dart';
+
 
 class DiscussionPage extends StatefulWidget {
   const DiscussionPage({
@@ -342,20 +342,16 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                                             widget.discussion,
                                                       ),
                                               ),
-                                              SliverPersistentHeader(
-                                                pinned: true,
-                                                delegate: StickyHeaderDelegate(
-                                                  child:
-                                                      DiscussionActionButtons(
-                                                    key: actionButtonsKey,
-                                                    discussion:
-                                                        widget.discussion,
-                                                    hData: widget.hData,
-                                                    onCommentAdded:
-                                                        _handleCommentAdded,
-                                                    onEditSuccess: () =>
-                                                        setState(() {}),
-                                                  ),
+                                              SliverToBoxAdapter(
+                                                child: DiscussionActionButtons(
+                                                  key: actionButtonsKey,
+                                                  discussion:
+                                                      widget.discussion,
+                                                  hData: widget.hData,
+                                                  onCommentAdded:
+                                                      _handleCommentAdded,
+                                                  onEditSuccess: () =>
+                                                      setState(() {}),
                                                 ),
                                               ),
                                               SliverToBoxAdapter(
@@ -373,15 +369,20 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                                             widget.discussion,
                                                         isInitialLoading:
                                                             _isInitialLoading,
-                                                        onReply: (id, userName,
-                                                                {addPrefix =
-                                                                    false}) =>
+                                                        onReply: (
+                                                          id,
+                                                          userName, {
+                                                          addPrefix = false,
+                                                          authorDocumentId,
+                                                        }) =>
                                                             actionButtonsKey
                                                                 .currentState
                                                                 ?.replyTo(
                                                           id,
                                                           userName,
                                                           addPrefix: addPrefix,
+                                                          authorDocumentId:
+                                                              authorDocumentId,
                                                         ),
                                                       ),
                                                     ],

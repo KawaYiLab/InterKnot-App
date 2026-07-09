@@ -129,11 +129,17 @@ class DiscussionDesktopBody extends StatelessWidget {
                             controller: scrollController,
                             physics: physics,
                             padding: const EdgeInsets.all(16.0),
-                            onReply: (id, userName, {addPrefix = false}) =>
+                            onReply: (
+                              id,
+                              userName, {
+                              addPrefix = false,
+                              authorDocumentId,
+                            }) =>
                                 actionButtonsKey.currentState?.replyTo(
                               id,
                               userName,
                               addPrefix: addPrefix,
+                              authorDocumentId: authorDocumentId,
                             ),
                           ),
                         ),

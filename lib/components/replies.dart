@@ -25,7 +25,12 @@ class Replies extends StatefulWidget {
 
   final CommentModel comment;
   final DiscussionModel discussion;
-  final void Function(String id, String? userName, {bool addPrefix}) onReply;
+  final void Function(
+    String id,
+    String? userName, {
+    bool addPrefix,
+    String? authorDocumentId,
+  }) onReply;
   final Future<void> Function(CommentModel comment)? onDelete;
   final Set<String> removingCommentIds;
   final VoidCallback? onCollapseScrollToParent;
@@ -273,8 +278,11 @@ class _RepliesState extends State<Replies> {
                             const SizedBox(width: 8),
                             TextButton(
                               onPressed: () => widget.onReply(
-                                  widget.comment.id, reply.author.name,
-                                  addPrefix: true),
+                                widget.comment.id,
+                                reply.author.name,
+                                addPrefix: true,
+                                authorDocumentId: reply.author.authorId,
+                              ),
                               style: ButtonStyle(
                                 padding:
                                     WidgetStateProperty.all(EdgeInsets.zero),
@@ -537,6 +545,7 @@ class _RepliesState extends State<Replies> {
                         widget.comment.id,
                         reply.author.name,
                         addPrefix: true,
+                        authorDocumentId: reply.author.authorId,
                       ),
                       style: ButtonStyle(
                         padding: WidgetStateProperty.all(EdgeInsets.zero),
