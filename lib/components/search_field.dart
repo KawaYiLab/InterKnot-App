@@ -380,7 +380,14 @@ class _SearchFieldState extends State<SearchField> {
           controller: textEditingController,
           focusNode: focusNode,
           onChanged: (_) {},
-          onSubmitted: (_) => onFieldSubmitted(),
+          onSubmitted: (_) {
+            final text = textEditingController.text.trim();
+            if (text.isNotEmpty) {
+              _performSearch(text);
+            } else {
+              onFieldSubmitted();
+            }
+          },
           onTap: () => focusNode.requestFocus(),
           constraints: BoxConstraints(
             minHeight: isCompact ? 36 : 40,
