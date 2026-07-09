@@ -83,7 +83,7 @@ class _Hover3DState extends State<Hover3D> with SingleTickerProviderStateMixin {
               ..setEntry(3, 2, 0.001) // Perspective
               ..rotateX(rotateX)
               ..rotateY(rotateY)
-              ..scaleByDouble(scale, scale, scale, 1.0);
+              ..scale(scale);
 
             return Transform(
               transform: transform,

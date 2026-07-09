@@ -779,7 +779,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
           SizeTransition(
             sizeFactor: _sizeAnimation,
             axis: Axis.horizontal,
-            alignment: Alignment.centerLeft,
+            axisAlignment: -1.0,
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: Row(

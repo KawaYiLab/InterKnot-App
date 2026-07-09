@@ -71,7 +71,11 @@ Future<void> showCreateDiscussionPostSettingsSheet({
                       ),
                       trailing: Switch(
                         value: localCompress,
-                        activeThumbColor: const Color(0xffD7FF00),
+                        thumbColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? const Color(0xffD7FF00)
+                              : null,
+                        ),
                         onChanged: (value) {
                           setSheetState(() {
                             localCompress = value;
