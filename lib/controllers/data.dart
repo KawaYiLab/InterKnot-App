@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:inter_knot/controllers/interaction_controller.dart';
 import 'package:inter_knot/api/api.dart'; // Import Api
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/constants/api_config.dart';
@@ -61,7 +62,9 @@ class Controller extends GetxController {
   final isUploadingAvatar = false.obs;
   final unreadNotificationCount = 0.obs;
 
-  final bookmarks = <HDataModel>{}.obs;
+  late final InteractionController _interaction;
+  RxSet<HDataModel> get bookmarks => _interaction.bookmarks;
+
   final history = <HDataModel>{}.obs;
   static const String _historyKey = 'history';
   static const String _localReadCacheKey = 'local_read_cache';
@@ -234,7 +237,7 @@ class Controller extends GetxController {
     _clearCachedAvatarForUser(u);
     await box.remove('access_token');
     await box.remove('userId');
-    bookmarks.clear();
+    _interaction.clearBookmarks();
     _localReadCache.clear();
     _localViewCache.clear();
     await box.remove(_localReadCacheKey);
@@ -285,7 +288,7 @@ class Controller extends GetxController {
     }
 
     searchResult.refresh();
-    bookmarks.refresh();
+    _interaction.bookmarks.refresh();
     history.refresh();
   }
 
@@ -420,7 +423,7 @@ class Controller extends GetxController {
     _persistLocalViewCache();
     HDataModel.upsertCachedDiscussion(discussion);
     searchResult.refresh();
-    bookmarks.refresh();
+    _interaction.bookmarks.refresh();
     history.refresh();
   }
 
@@ -441,6 +444,7 @@ class Controller extends GetxController {
   @override
   Future<void> onInit() async {
     super.onInit();
+    _interaction = Get.put(InteractionController(this));
     pref = await SharedPreferencesWithCache.create(
       cacheOptions: const SharedPreferencesWithCacheOptions(),
     );
@@ -718,37 +722,9 @@ class Controller extends GetxController {
     unreadNotificationCount.value = 0;
   }
 
-  Future<void> refreshFavorites() async {
-    final username = user.value?.login ?? '';
-    if (isLogin.isFalse || username.isEmpty) {
-      bookmarks.clear();
-      return;
-    }
+  Future<void> refreshFavorites() => _interaction.refreshFavorites();
 
-    final result = await api.getFavorites(username, '');
-    bookmarks(result.items.toSet());
-  }
-
-  Future<void> toggleFavorite(HDataModel hData) async {
-    if (isLogin.isFalse) {
-      showToast('请先登录', isError: true);
-      return;
-    }
-
-    final articleId = hData.id;
-    if (articleId.isEmpty) return;
-
-    try {
-      final result = await api.toggleFavorite(articleId);
-      if (result.favorited) {
-        bookmarks({hData, ...bookmarks});
-      } else {
-        bookmarks.removeWhere((e) => e.id == articleId);
-      }
-    } catch (e) {
-      showToast('收藏操作失败: $e', isError: true);
-    }
-  }
+  Future<void> toggleFavorite(HDataModel hData) => _interaction.toggleFavorite(hData);
 
   final selectedIndex = 0.obs;
   final pageController = PageController();
@@ -955,79 +931,11 @@ class Controller extends GetxController {
     }
   }
 
-  Future<void> toggleArticleLike(DiscussionModel discussion) async {
-    if (isLogin.isFalse) {
-      if (!await ensureLogin()) return;
-    }
+  Future<void> toggleArticleLike(DiscussionModel discussion) =>
+      _interaction.toggleArticleLike(discussion);
 
-    final oldLiked = discussion.liked;
-    final oldCount = discussion.likesCount;
-
-    // Optimistic update
-    discussion.liked = !oldLiked;
-    discussion.likesCount = oldLiked
-        ? (oldCount > 0 ? oldCount - 1 : 0)
-        : oldCount + 1;
-
-    // Update cached discussion
-    HDataModel.upsertCachedDiscussion(discussion);
-    searchResult.refresh();
-    bookmarks.refresh();
-    history.refresh();
-
-    try {
-      final result = await api.toggleLike(
-        targetType: 'article',
-        targetId: discussion.id,
-      );
-      // Reconcile with server response
-      discussion.liked = result.liked;
-      discussion.likesCount = result.likesCount;
-      HDataModel.upsertCachedDiscussion(discussion);
-      searchResult.refresh();
-      bookmarks.refresh();
-      history.refresh();
-    } catch (e) {
-      // Rollback on error
-      discussion.liked = oldLiked;
-      discussion.likesCount = oldCount;
-      HDataModel.upsertCachedDiscussion(discussion);
-      searchResult.refresh();
-      bookmarks.refresh();
-      history.refresh();
-      showToast('操作失败: $e', isError: true);
-    }
-  }
-
-  Future<void> toggleCommentLike(CommentModel comment) async {
-    if (isLogin.isFalse) {
-      if (!await ensureLogin()) return;
-    }
-
-    final oldLiked = comment.liked;
-    final oldCount = comment.likesCount;
-
-    // Optimistic update
-    comment.liked = !oldLiked;
-    comment.likesCount = oldLiked
-        ? (oldCount > 0 ? oldCount - 1 : 0)
-        : oldCount + 1;
-
-    try {
-      final result = await api.toggleLike(
-        targetType: 'comment',
-        targetId: comment.id,
-      );
-      // Reconcile with server response
-      comment.liked = result.liked;
-      comment.likesCount = result.likesCount;
-    } catch (e) {
-      // Rollback on error
-      comment.liked = oldLiked;
-      comment.likesCount = oldCount;
-      showToast('操作失败: $e', isError: true);
-    }
-  }
+  Future<void> toggleCommentLike(CommentModel comment) =>
+      _interaction.toggleCommentLike(comment);
 
   Future<void> updateUsername(String newName) async {
     if (isLogin.isFalse) {
