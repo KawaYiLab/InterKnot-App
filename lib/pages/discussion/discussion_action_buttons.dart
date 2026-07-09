@@ -159,6 +159,13 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       return;
     }
 
+    final user = c.user.value;
+    final authorId = c.authorId.value ?? await c.ensureAuthorForUser(user);
+    if (authorId == null || authorId.isEmpty) {
+      showToast('无法关联作者，请重新登录后再试', isError: true);
+      return;
+    }
+
     final imageIds = _imageUploads
         .where((t) => t.serverId != null && t.serverId!.isNotEmpty)
         .map((t) => t.serverId!)
@@ -167,13 +174,6 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     setState(() => _isLoading = true);
 
     try {
-      final user = c.user.value;
-      final authorId = c.authorId.value ?? await c.ensureAuthorForUser(user);
-      if (authorId == null || authorId.isEmpty) {
-        showToast('无法关联作者，请重新登录后再试', isError: true);
-        return;
-      }
-
       final res = await api.addDiscussionComment(
         widget.discussion.id,
         content,
@@ -463,6 +463,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
           itemBuilder: (context, index) {
             final task = _imageUploads[index];
             return Stack(
+              clipBehavior: Clip.none,
               children: [
                 Container(
                   width: 72,
