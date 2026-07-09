@@ -210,7 +210,11 @@ class InteractionController extends GetxController {
     }
 
     final user = _controller.user.value;
-    if (user?.login == discussion.author.login) {
+    if (user == null) {
+      showToast('请先登录', isError: true);
+      return;
+    }
+    if (user.login == discussion.author.login) {
       showToast('不能给自己的帖子三连', isError: true);
       return;
     }
