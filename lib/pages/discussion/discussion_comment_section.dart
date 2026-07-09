@@ -16,7 +16,12 @@ class DiscussionCommentSection extends StatelessWidget {
 
   final DiscussionModel discussion;
   final bool isInitialLoading;
-  final void Function(String id, String? userName, {bool addPrefix}) onReply;
+  final void Function(
+    String id,
+    String? userName, {
+    bool addPrefix,
+    String? authorDocumentId,
+  }) onReply;
 
   final bool useListView;
   final ScrollController? controller;

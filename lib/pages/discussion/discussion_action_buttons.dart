@@ -3,14 +3,33 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/components/click_region.dart';
+import 'package:inter_knot/components/emote_picker.dart';
+import 'package:inter_knot/components/mention_search_sheet.dart';
 import 'package:inter_knot/components/triple_action_button.dart';
+import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
+import 'package:inter_knot/helpers/content_segments.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/models/mention_candidate.dart';
 import 'package:inter_knot/pages/create_discussion_page.dart';
+import 'package:image_picker/image_picker.dart';
+
+/// 评论图片上传任务。
+class _ImageUploadTask {
+  List<int>? bytes;
+  String? filename;
+  String? mimeType;
+  String? serverId;
+  String? serverUrl;
+  String? previewUrl;
+  bool isUploading = false;
+  int progress = 0;
+  String? error;
+}
 
 class DiscussionActionButtons extends StatefulWidget {
   const DiscussionActionButtons({
@@ -38,12 +57,17 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
 
   bool _isWriting = false;
   bool _isLoading = false;
+  bool _isOverlayOpen = false;
   String? _parentId;
   String? _replyToUser;
+  String? _replyToAuthorId;
   bool _addReplyPrefix = false;
 
   final TextEditingController _textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ImagePicker _imagePicker = ImagePicker();
+  final List<_ImageUploadTask> _imageUploads = [];
+
   late final AnimationController _controller;
   late final Animation<double> _sizeAnimation;
   late final Animation<double> _fadeAnimation;
@@ -66,13 +90,21 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     _controller.value = 1.0;
   }
 
-  Future<void> replyTo(String parentId, String? userName,
-      {bool addPrefix = false}) async {
+  Future<void> replyTo(
+    String parentId,
+    String? userName, {
+    bool addPrefix = false,
+    String? authorDocumentId,
+  }) async {
     if (!await c.ensureLogin()) return;
 
     setState(() {
       _parentId = parentId;
       _replyToUser = userName;
+      _replyToAuthorId =
+          (authorDocumentId != null && authorDocumentId.isNotEmpty)
+              ? authorDocumentId
+              : null;
       _isWriting = true;
       _addReplyPrefix = addPrefix;
     });
@@ -80,6 +112,28 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+
+    if (addPrefix &&
+        userName != null &&
+        authorDocumentId != null &&
+        authorDocumentId.isNotEmpty) {
+      final token = buildMentionToken(userName, authorDocumentId);
+      final current = _stripLeadingMention(_textController.text);
+      _textController.value = TextEditingValue(
+        text: '$token $current',
+        selection: TextSelection.collapsed(offset: token.length + 1),
+      );
+    }
+  }
+
+  String _stripLeadingMention(String text) {
+    final tokens = parseMentions(text);
+    if (tokens.isNotEmpty && tokens.first.start == 0) {
+      var tail = text.substring(tokens.first.end);
+      if (tail.startsWith(' ')) tail = tail.substring(1);
+      return tail;
+    }
+    return text;
   }
 
   @override
@@ -97,27 +151,46 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       return;
     }
 
-    if (_addReplyPrefix && _replyToUser != null) {
+    // 历史兼容：旧 reply 回填是纯文本，未带 authorDocumentId 时降级处理
+    if (_addReplyPrefix && _replyToUser != null && _replyToAuthorId == null) {
       content = '回复 @$_replyToUser :$content';
     }
 
     if (!await c.ensureLogin()) return;
 
+    final uploading = _imageUploads.any((t) => t.isUploading);
+    if (uploading) {
+      showToast('图片上传中，请稍候', isError: true);
+      return;
+    }
+
+    final failedUploads = _imageUploads.where((t) => t.error != null).toList();
+    if (failedUploads.isNotEmpty) {
+      showToast('有 ${failedUploads.length} 张图片上传失败，将不会包含在评论中',
+          isError: true);
+    }
+
+    final user = c.user.value;
+    final authorId = c.authorId.value ?? await c.ensureAuthorForUser(user);
+    if (authorId == null || authorId.isEmpty) {
+      showToast('无法关联作者，请重新登录后再试', isError: true);
+      return;
+    }
+
+    final imageIds = _imageUploads
+        .where((t) => t.serverId != null && t.serverId!.isNotEmpty)
+        .map((t) => t.serverId!)
+        .toList();
+
     setState(() => _isLoading = true);
 
     try {
-      final user = c.user.value;
-      final authorId = c.authorId.value ?? await c.ensureAuthorForUser(user);
-      if (authorId == null || authorId.isEmpty) {
-        showToast('无法关联作者，请重新登录后再试', isError: true);
-        return;
-      }
-
       final res = await api.addDiscussionComment(
         widget.discussion.id,
         content,
         authorId: authorId,
         parentId: _parentId,
+        imageIds: imageIds,
       );
 
       if (res.hasError) {
@@ -180,11 +253,136 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       _isWriting = false;
       _parentId = null;
       _replyToUser = null;
+      _replyToAuthorId = null;
       _addReplyPrefix = false;
+      _imageUploads.clear();
     });
     _textController.clear();
     _controller.forward();
     _focusNode.unfocus();
+  }
+
+  void _insertText(String text) {
+    final value = _textController.value;
+    final before = value.selection.textBefore(value.text);
+    final after = value.selection.textAfter(value.text);
+    _textController.value = value.copyWith(
+      text: before + text + after,
+      selection: TextSelection.collapsed(offset: before.length + text.length),
+    );
+  }
+
+  Future<void> _openEmotePicker() async {
+    setState(() => _isOverlayOpen = true);
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const EmotePicker(),
+    ).whenComplete(() {
+      if (mounted) setState(() => _isOverlayOpen = false);
+    });
+    if (result == null || !mounted) return;
+    _focusNode.requestFocus();
+    if (result.startsWith('ik-')) {
+      _insertText(buildEmoteToken(result));
+    } else {
+      _insertText(result);
+    }
+  }
+
+  Future<void> _openMentionPicker() async {
+    setState(() => _isOverlayOpen = true);
+    final candidate = await showModalBottomSheet<MentionCandidateModel>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const MentionSearchSheet(),
+    ).whenComplete(() {
+      if (mounted) setState(() => _isOverlayOpen = false);
+    });
+    if (candidate == null || !mounted) return;
+    _focusNode.requestFocus();
+    _insertText(buildMentionToken(candidate.name, candidate.documentId));
+  }
+
+  Future<void> _pickImages() async {
+    setState(() => _isOverlayOpen = true);
+    try {
+      final picked = await _imagePicker.pickMultiImage();
+      if (picked.isEmpty || !mounted) return;
+
+      for (final xfile in picked) {
+        final bytes = await xfile.readAsBytes();
+        final mime = _guessMime(xfile.name);
+        final task = _ImageUploadTask()
+          ..bytes = bytes
+          ..filename = xfile.name
+          ..mimeType = mime
+          ..isUploading = true;
+
+        if (!mounted) return;
+        setState(() => _imageUploads.add(task));
+        _uploadImage(task);
+      }
+    } finally {
+      if (mounted) setState(() => _isOverlayOpen = false);
+    }
+  }
+
+  String _guessMime(String filename) {
+    final ext = filename.split('.').lastOrNull?.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  Future<void> _uploadImage(_ImageUploadTask task) async {
+    if (task.bytes == null || task.filename == null) return;
+    try {
+      final result = await api.uploadImage(
+        bytes: task.bytes!,
+        filename: task.filename!,
+        mimeType: task.mimeType ?? 'image/jpeg',
+        onProgress: (percent) {
+          if (mounted) setState(() => task.progress = percent);
+        },
+      );
+      final data = result;
+      if (data == null) throw Exception('upload result is null');
+      task.serverId = data['documentId']?.toString() ?? data['id']?.toString();
+      final url = _normalizeUrl(data['url']?.toString() ??
+          data['formats']?['thumbnail']?['url']?.toString());
+      task.serverUrl = url;
+      task.previewUrl = url;
+    } catch (e) {
+      if (mounted) {
+        setState(() => task.error = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => task.isUploading = false);
+      }
+    }
+  }
+
+  String? _normalizeUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('/')) return '${ApiConfig.baseUrl}$url';
+    return '${ApiConfig.baseUrl}/$url';
+  }
+
+  void _removeImage(int index) {
+    setState(() => _imageUploads.removeAt(index));
   }
 
   bool _isLiking = false;
@@ -257,11 +455,133 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     }
   }
 
+  Widget _buildImagePreviews() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        height: 72,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _imageUploads.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final task = _imageUploads[index];
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xff2D2D2D),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: task.previewUrl != null && task.previewUrl!.isNotEmpty
+                        ? Image.network(
+                            task.previewUrl!,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (_, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.broken_image,
+                                    color: Colors.grey, size: 24),
+                          )
+                        : const Center(
+                            child: Icon(Icons.image, color: Colors.grey),
+                          ),
+                  ),
+                ),
+                if (task.isUploading)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black54,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: task.progress / 100,
+                          strokeWidth: 2,
+                          color: const Color(0xffBFFF09),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (task.error != null)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black54,
+                      child: const Center(
+                        child: Icon(Icons.error_outline,
+                            color: Colors.red, size: 20),
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: ClickRegion(
+                      onTap: () => _removeImage(index),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close, size: 12),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolbar() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 2),
+      child: Row(
+        children: [
+          ClickRegion(
+            onTap: _openEmotePicker,
+            child: const Icon(Icons.emoji_emotions,
+                color: Colors.grey, size: 22),
+          ),
+          const SizedBox(width: 16),
+          ClickRegion(
+            onTap: _openMentionPicker,
+            child: const Icon(Icons.alternate_email,
+                color: Colors.grey, size: 22),
+          ),
+          const SizedBox(width: 16),
+          ClickRegion(
+            onTap: _pickImages,
+            child: const Icon(Icons.image, color: Colors.grey, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return TapRegion(
       onTapOutside: (_) {
-        if (_isWriting) _cancel();
+        if (_isWriting && !_isOverlayOpen) _cancel();
       },
       child: Row(
         children: [
@@ -269,7 +589,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: const Color(0xff222222),
                 borderRadius: BorderRadius.circular(maxRadius),
@@ -305,28 +625,46 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8.0),
-                                      child: CallbackShortcuts(
-                                        bindings: {
-                                          const SingleActivator(
-                                                  LogicalKeyboardKey.escape):
-                                              _cancel,
-                                        },
-                                        child: TextField(
-                                          controller: _textController,
-                                          focusNode: _focusNode,
-                                          style: const TextStyle(
-                                              fontSize: 16,
-                                              color: Colors.white),
-                                          cursorColor: Colors.white,
-                                          decoration: InputDecoration.collapsed(
-                                            hintText: _replyToUser != null
-                                                ? '回复 @$_replyToUser：'
-                                                : '请输入文本...',
-                                            hintStyle: const TextStyle(
-                                                color: Colors.grey),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (_imageUploads.isNotEmpty)
+                                            _buildImagePreviews(),
+                                          CallbackShortcuts(
+                                            bindings: {
+                                              const SingleActivator(
+                                                      LogicalKeyboardKey
+                                                          .escape):
+                                                  _cancel,
+                                              const SingleActivator(
+                                                LogicalKeyboardKey.enter,
+                                                control: true,
+                                              ): _submit,
+                                            },
+                                            child: TextField(
+                                              controller: _textController,
+                                              focusNode: _focusNode,
+                                              style: const TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.white),
+                                              cursorColor: Colors.white,
+                                              minLines: 1,
+                                              maxLines: 6,
+                                              keyboardType:
+                                                  TextInputType.multiline,
+                                              decoration:
+                                                  InputDecoration.collapsed(
+                                                hintText: _replyToUser != null
+                                                    ? '回复 @$_replyToUser：'
+                                                    : '请输入文本...',
+                                                hintStyle: const TextStyle(
+                                                    color: Colors.grey),
+                                              ),
+                                            ),
                                           ),
-                                          onSubmitted: (_) => _submit(),
-                                        ),
+                                          if (_isWriting)
+                                            _buildToolbar(),
+                                        ],
                                       ),
                                     ),
                                   ),
