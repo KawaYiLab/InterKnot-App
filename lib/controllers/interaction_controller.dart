@@ -281,6 +281,7 @@ class InteractionController extends GetxController {
       hData.favorited = result.favorited;
       hData.favoritesCount = result.favoritesCount;
       discussion.dennyCount = result.dennyCount;
+      hData.dennyCount = result.dennyCount;
 
       if (result.coinGiven || result.coinReason == 'ALREADY_GIVEN') {
         discussion.hasGivenDenny = true;
