@@ -217,6 +217,8 @@ class InteractionController extends GetxController {
 
     final oldLiked = discussion.liked;
     final oldLikesCount = discussion.likesCount;
+    final oldHDataLiked = hData.liked;
+    final oldHDataLikesCount = hData.likesCount;
     final oldFavorited = hData.favorited;
     final oldFavoritesCount = hData.favoritesCount;
     final oldDennyCount = discussion.dennyCount;
@@ -225,6 +227,8 @@ class InteractionController extends GetxController {
     // 三连 = 点赞 + 收藏 + 投币（幂等/软失败）
     discussion.liked = true;
     if (!oldLiked) discussion.likesCount++;
+    hData.liked = true;
+    if (!oldHDataLiked) hData.likesCount++;
     hData.favorited = true;
     if (!oldFavorited) hData.favoritesCount++;
     if (!oldHasGivenDenny) {
@@ -235,8 +239,8 @@ class InteractionController extends GetxController {
     // 同步详情页缓存的 DiscussionModel
     final cached = hData.cachedDiscussion;
     if (cached != null && cached != discussion) {
-      cached.liked = discussion.liked;
-      cached.likesCount = discussion.likesCount;
+      cached.liked = hData.liked;
+      cached.likesCount = hData.likesCount;
       cached.favorited = hData.favorited;
       cached.favoritesCount = hData.favoritesCount;
       cached.dennyCount = discussion.dennyCount;
@@ -260,6 +264,8 @@ class InteractionController extends GetxController {
       // 与后端状态对齐（投币失败不阻断点赞+收藏）
       discussion.liked = result.liked;
       discussion.likesCount = result.likesCount;
+      hData.liked = result.liked;
+      hData.likesCount = result.likesCount;
       hData.favorited = result.favorited;
       hData.favoritesCount = result.favoritesCount;
       discussion.dennyCount = result.dennyCount;
@@ -282,8 +288,8 @@ class InteractionController extends GetxController {
 
       final cached = hData.cachedDiscussion;
       if (cached != null) {
-        cached.liked = discussion.liked;
-        cached.likesCount = discussion.likesCount;
+        cached.liked = hData.liked;
+        cached.likesCount = hData.likesCount;
         cached.favorited = hData.favorited;
         cached.favoritesCount = hData.favoritesCount;
         cached.dennyCount = discussion.dennyCount;
@@ -300,6 +306,8 @@ class InteractionController extends GetxController {
       // 回滚全部状态
       discussion.liked = oldLiked;
       discussion.likesCount = oldLikesCount;
+      hData.liked = oldHDataLiked;
+      hData.likesCount = oldHDataLikesCount;
       hData.favorited = oldFavorited;
       hData.favoritesCount = oldFavoritesCount;
       discussion.dennyCount = oldDennyCount;
