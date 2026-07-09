@@ -726,6 +726,12 @@ class Controller extends GetxController {
 
   Future<void> toggleFavorite(HDataModel hData) => _interaction.toggleFavorite(hData);
 
+  Future<void> tripleArticle(DiscussionModel discussion, HDataModel hData) =>
+      _interaction.tripleArticle(discussion, hData);
+
+  bool canTriple(DiscussionModel discussion) =>
+      _interaction.canTriple(discussion);
+
   final selectedIndex = 0.obs;
   final pageController = PageController();
 

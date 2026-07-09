@@ -5,6 +5,7 @@ import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/components/click_region.dart';
 import 'package:inter_knot/components/emote_picker.dart';
 import 'package:inter_knot/components/mention_search_sheet.dart';
+import 'package:inter_knot/components/triple_action_button.dart';
 import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
@@ -385,51 +386,39 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   }
 
   bool _isLiking = false;
+  bool _isTripling = false;
 
   Future<void> _handleLike() async {
-    if (_isLiking) return;
+    if (_isLiking || _isTripling) return;
     _isLiking = true;
-    await c.toggleArticleLike(widget.discussion);
-    if (mounted) setState(() {});
-    _isLiking = false;
+    try {
+      await c.toggleArticleLike(widget.discussion);
+    } finally {
+      if (mounted) setState(() {});
+      _isLiking = false;
+    }
   }
 
-  Widget _buildLikeButton() {
-    final liked = widget.discussion.liked;
-    final count = widget.discussion.likesCount;
-    return Tooltip(
-      message: liked ? '取消点赞' : '点赞',
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xff222222),
-          borderRadius: BorderRadius.circular(maxRadius),
-          border: Border.all(color: const Color(0xff2D2D2D), width: 4),
-        ),
-        child: ClickRegion(
-          onTap: _handleLike,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                liked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                color: liked ? const Color(0xffD7FF00) : null,
-                size: 22,
-              ),
-              if (count > 0) ...[
-                const SizedBox(width: 4),
-                Text(
-                  count.toString(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: liked ? const Color(0xffD7FF00) : Colors.grey,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+  Future<void> _handleTriple() async {
+    if (_isLiking || _isTripling) return;
+    _isTripling = true;
+    try {
+      await c.tripleArticle(widget.discussion, widget.hData);
+    } finally {
+      if (mounted) setState(() {});
+      _isTripling = false;
+    }
+  }
+
+  Widget _buildTripleActionButton() {
+    return Obx(
+      () => TripleActionButton(
+        liked: widget.discussion.liked,
+        likesCount: widget.discussion.likesCount,
+        canTriple: c.canTriple(widget.discussion),
+        busy: _isLiking || _isTripling,
+        onLike: _handleLike,
+        onTriple: _handleTriple,
       ),
     );
   }
@@ -757,12 +746,13 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
               child: Row(
                 children: [
                   const SizedBox(width: 8),
-                  _buildLikeButton(),
+                  _buildTripleActionButton(),
                   const SizedBox(width: 8),
                   Obx(() {
                     final isLiked = c.bookmarks
                         .map((e) => e.id)
                         .contains(widget.discussion.id);
+                    final count = widget.hData.favoritesCount;
                     return Tooltip(
                       message: isLiked ? '取消收藏' : '收藏',
                       child: Container(
@@ -775,9 +765,28 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                         ),
                         child: ClickRegion(
                           onTap: () => c.toggleFavorite(widget.hData),
-                          child: Icon(
-                            isLiked ? Icons.favorite : Icons.favorite_outline,
-                            color: isLiked ? Colors.red : null,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isLiked
+                                    ? Icons.favorite
+                                    : Icons.favorite_outline,
+                                color: isLiked ? Colors.red : null,
+                                size: 22,
+                              ),
+                              if (count > 0) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  count.toString(),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isLiked ? Colors.red : Colors.grey,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),

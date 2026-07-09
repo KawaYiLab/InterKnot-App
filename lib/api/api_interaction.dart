@@ -98,6 +98,50 @@ extension InteractionApi on Api {
     return {};
   }
 
+  Future<({
+    bool liked,
+    int likesCount,
+    bool favorited,
+    int favoritesCount,
+    bool coinGiven,
+    String coinReason,
+    int dennyCount,
+    int? newBalance,
+  })> tripleAction(String articleId) async {
+    final res = await post(
+      '/api/articles/triple',
+      {'articleId': articleId},
+    );
+
+    if (res.hasError) {
+      debugPrint('TripleAction Error: ${res.statusCode} - ${res.bodyString}');
+      final body = res.body;
+      String msg = '三连失败';
+      if (body is Map) {
+        final error = body['error'];
+        if (error is Map && error['message'] != null) {
+          msg = error['message'].toString();
+        }
+      }
+      throw ApiException(msg, statusCode: res.statusCode);
+    }
+
+    final body = res.body;
+    if (body is Map<String, dynamic>) {
+      return (
+        liked: body['liked'] == true,
+        likesCount: (body['likesCount'] as num?)?.toInt() ?? 0,
+        favorited: body['favorited'] == true,
+        favoritesCount: (body['favoritesCount'] as num?)?.toInt() ?? 0,
+        coinGiven: body['coinGiven'] == true,
+        coinReason: body['coinReason']?.toString() ?? 'FAILED',
+        dennyCount: (body['dennyCount'] as num?)?.toInt() ?? 0,
+        newBalance: body['newBalance'] is int ? body['newBalance'] as int : null,
+      );
+    }
+    throw ApiException('Invalid triple action response');
+  }
+
 
   Future<void> markAsRead(String articleId) async {
     final userId = box.read<String>('userId');
