@@ -35,10 +35,12 @@ class _SearchFieldState extends State<SearchField> {
   final FocusNode _focusNode = FocusNode();
   Timer? _suggestDebounce;
   int _suggestSeq = 0;
+  Completer<Iterable<SearchSuggestionModel>>? _pendingCompleter;
 
   @override
   void dispose() {
     _suggestDebounce?.cancel();
+    _pendingCompleter?.complete([]);
     _focusNode.dispose();
     super.dispose();
   }
@@ -48,6 +50,7 @@ class _SearchFieldState extends State<SearchField> {
   ) async {
     final query = value.text;
     if (query.isEmpty) {
+      _pendingCompleter?.complete([]);
       return c.searchHistory
           .map((k) => SearchSuggestionModel.history(k, query: k))
           .toList();
@@ -55,7 +58,12 @@ class _SearchFieldState extends State<SearchField> {
 
     final seq = ++_suggestSeq;
     _suggestDebounce?.cancel();
+    final previous = _pendingCompleter;
+    if (previous != null && !previous.isCompleted) {
+      previous.complete([]);
+    }
     final completer = Completer<Iterable<SearchSuggestionModel>>();
+    _pendingCompleter = completer;
 
     _suggestDebounce = Timer(const Duration(milliseconds: 200), () async {
       if (seq != _suggestSeq || !mounted) {

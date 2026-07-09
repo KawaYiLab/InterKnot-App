@@ -113,7 +113,7 @@ class SearchSuggestionModel {
     final spans = <InlineSpan>[];
     for (final node in nodes) {
       if (node is dom.Text) {
-        final text = node.text.trim();
+        final text = node.text;
         if (text.isNotEmpty) {
           spans.add(TextSpan(text: text, style: baseStyle));
         }

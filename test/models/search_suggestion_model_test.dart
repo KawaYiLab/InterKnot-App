@@ -69,5 +69,19 @@ void main() {
       expect((spans[1] as TextSpan).style?.color, Colors.black);
       expect((spans[2] as TextSpan).text, '指南');
     });
+
+    test('buildHighlightSpans preserves inter-word spaces around marks', () {
+      const html = 'Hello <mark>world</mark> test';
+      final spans = SearchSuggestionModel.buildHighlightSpans(
+        html,
+        baseStyle: const TextStyle(color: Colors.white),
+        highlightStyle: const TextStyle(color: Colors.black),
+      );
+
+      expect(spans.length, 3);
+      expect((spans[0] as TextSpan).text, 'Hello ');
+      expect((spans[1] as TextSpan).text, 'world');
+      expect((spans[2] as TextSpan).text, ' test');
+    });
   });
 }
