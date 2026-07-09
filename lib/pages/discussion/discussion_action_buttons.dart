@@ -391,17 +391,23 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   Future<void> _handleLike() async {
     if (_isLiking || _isTripling) return;
     _isLiking = true;
-    await c.toggleArticleLike(widget.discussion);
-    if (mounted) setState(() {});
-    _isLiking = false;
+    try {
+      await c.toggleArticleLike(widget.discussion);
+    } finally {
+      if (mounted) setState(() {});
+      _isLiking = false;
+    }
   }
 
   Future<void> _handleTriple() async {
     if (_isLiking || _isTripling) return;
     _isTripling = true;
-    await c.tripleArticle(widget.discussion, widget.hData);
-    if (mounted) setState(() {});
-    _isTripling = false;
+    try {
+      await c.tripleArticle(widget.discussion, widget.hData);
+    } finally {
+      if (mounted) setState(() {});
+      _isTripling = false;
+    }
   }
 
   Widget _buildTripleActionButton() {
