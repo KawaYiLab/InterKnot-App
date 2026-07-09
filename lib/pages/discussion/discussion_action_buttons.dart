@@ -299,22 +299,25 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
 
   Future<void> _pickImages() async {
     setState(() => _isOverlayOpen = true);
-    final picked = await _imagePicker.pickMultiImage();
-    if (mounted) setState(() => _isOverlayOpen = false);
-    if (picked.isEmpty || !mounted) return;
+    try {
+      final picked = await _imagePicker.pickMultiImage();
+      if (picked.isEmpty || !mounted) return;
 
-    for (final xfile in picked) {
-      final bytes = await xfile.readAsBytes();
-      final mime = _guessMime(xfile.name);
-      final task = _ImageUploadTask()
-        ..bytes = bytes
-        ..filename = xfile.name
-        ..mimeType = mime
-        ..isUploading = true;
+      for (final xfile in picked) {
+        final bytes = await xfile.readAsBytes();
+        final mime = _guessMime(xfile.name);
+        final task = _ImageUploadTask()
+          ..bytes = bytes
+          ..filename = xfile.name
+          ..mimeType = mime
+          ..isUploading = true;
 
-      if (!mounted) return;
-      setState(() => _imageUploads.add(task));
-      _uploadImage(task);
+        if (!mounted) return;
+        setState(() => _imageUploads.add(task));
+        _uploadImage(task);
+      }
+    } finally {
+      if (mounted) setState(() => _isOverlayOpen = false);
     }
   }
 
@@ -668,7 +671,6 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                                                 hintStyle: const TextStyle(
                                                     color: Colors.grey),
                                               ),
-                                              onSubmitted: (_) => _submit(),
                                             ),
                                           ),
                                           if (_isWriting)
