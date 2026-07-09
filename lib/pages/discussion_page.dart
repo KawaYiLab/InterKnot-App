@@ -96,13 +96,21 @@ class _DiscussionPageState extends State<DiscussionPage> {
     _startNewCommentCheck();
     _fetchArticleDetails();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final wasRead = widget.discussion.isRead;
-      c.markDiscussionReadAndViewed(widget.discussion);
-      if (!wasRead) {
-        Get.find<Api>().markAsRead(widget.discussion.id);
+      int? serverViews;
+      try {
+        serverViews = await Get.find<Api>().viewArticle(widget.discussion.id);
+      } catch (e) {
+        logger.e('Failed to record article view', error: e);
       }
-      Get.find<Api>().viewArticle(widget.discussion.id);
+      c.markDiscussionReadAndViewed(
+        widget.discussion,
+        serverViews: serverViews,
+      );
+      if (!wasRead) {
+        await Get.find<Api>().markAsRead(widget.discussion.id);
+      }
     });
 
     scrollController.addListener(() {

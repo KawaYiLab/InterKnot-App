@@ -112,8 +112,18 @@ extension ArticleApi on Api {
   }
 
 
-  Future<void> viewArticle(String id) async {
-    await post('/api/articles/$id/view', {});
+  Future<int?> viewArticle(String id) async {
+    final res = await postWithRetry(
+      '/api/articles/$id/view',
+      {},
+      operationName: 'Record article view',
+    );
+    final body = res.body;
+    if (body is Map<String, dynamic>) {
+      final views = body['views'];
+      if (views is num) return views.toInt();
+    }
+    return null;
   }
 
 
