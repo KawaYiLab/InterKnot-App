@@ -318,7 +318,7 @@ class InteractionController extends GetxController {
       bookmarks.refresh();
       _controller.history.refresh();
 
-      _showTripleResultToast(result.coinReason);
+      _showTripleResultToast(result.coinGiven, result.coinReason);
     } catch (e) {
       // 回滚全部状态
       discussion.liked = oldLiked;
@@ -358,8 +358,10 @@ class InteractionController extends GetxController {
     }
   }
 
-  void _showTripleResultToast(String coinReason) {
-    if (coinReason == 'GIVEN' || coinReason == 'ALREADY_GIVEN') {
+  void _showTripleResultToast(bool coinGiven, String coinReason) {
+    if (coinGiven ||
+        coinReason == 'GIVEN' ||
+        coinReason == 'ALREADY_GIVEN') {
       showToast('三连成功！');
       return;
     }
