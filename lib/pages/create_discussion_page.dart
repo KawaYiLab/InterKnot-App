@@ -1138,8 +1138,6 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       return;
     }
 
-    _autoSaveDebounce?.cancel();
-
     final confirmed = await showDeleteConfirmDialog(
       context: context,
       title: '放弃修改',
@@ -1151,6 +1149,8 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     if (confirmed != true) {
       return;
     }
+
+    _autoSaveDebounce?.cancel();
 
     if (mounted) {
       setState(() {
