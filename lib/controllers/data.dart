@@ -66,7 +66,11 @@ class Controller extends GetxController {
   RxSet<HDataModel> get bookmarks => _interaction.bookmarks;
 
   final history = <HDataModel>{}.obs;
+  final searchHistory = <String>[].obs;
   static const String _historyKey = 'history';
+  static const String _searchHistoryKey = 'ik:search_history';
+  static const int _maxSearchHistory = 12;
+  static const int _maxSearchKeywordLength = 64;
   static const String _localReadCacheKey = 'local_read_cache';
   static const String _localViewCacheKey = 'local_view_cache';
   static const int _localCacheMax = 500;
@@ -91,6 +95,57 @@ class Controller extends GetxController {
   void _saveHistoryToLocal() {
     try {
       pref.setStringList(_historyKey, _encodeHistoryForStorage(history));
+    } catch (_) {
+      // Ignore persistence failures.
+    }
+  }
+
+  void _loadSearchHistory() {
+    try {
+      final list = pref.getStringList(_searchHistoryKey);
+      if (list != null && list.isNotEmpty) {
+        searchHistory.assignAll(list.where((k) => k.trim().isNotEmpty).toList());
+      }
+    } catch (_) {
+      // Ignore persistence failures.
+    }
+  }
+
+  void addSearchHistory(String keyword) {
+    final trimmed = keyword.trim();
+    if (trimmed.isEmpty) return;
+    final value = trimmed.length <= _maxSearchKeywordLength
+        ? trimmed
+        : trimmed.substring(0, _maxSearchKeywordLength);
+    final lower = value.toLowerCase();
+    final next = [
+      value,
+      ...searchHistory.where((k) => k.toLowerCase() != lower),
+    ].take(_maxSearchHistory).toList();
+    searchHistory.assignAll(next);
+    try {
+      pref.setStringList(_searchHistoryKey, next);
+    } catch (_) {
+      // Ignore persistence failures.
+    }
+  }
+
+  void removeSearchHistory(String keyword) {
+    final next = searchHistory.where((k) => k != keyword).toList();
+    if (next.length == searchHistory.length) return;
+    searchHistory.assignAll(next);
+    try {
+      pref.setStringList(_searchHistoryKey, next);
+    } catch (_) {
+      // Ignore persistence failures.
+    }
+  }
+
+  void clearSearchHistory() {
+    if (searchHistory.isEmpty) return;
+    searchHistory.clear();
+    try {
+      pref.setStringList(_searchHistoryKey, []);
     } catch (_) {
       // Ignore persistence failures.
     }
@@ -449,6 +504,7 @@ class Controller extends GetxController {
       cacheOptions: const SharedPreferencesWithCacheOptions(),
     );
     _loadLocalCaches();
+    _loadSearchHistory();
     pageController
         .addListener(() => curPage(pageController.page?.round() ?? 0));
     pref.remove('root_token');

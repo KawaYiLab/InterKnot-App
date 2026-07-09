@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/components/my_tab.dart';
+import 'package:inter_knot/components/search_field.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
 import 'package:inter_knot/pages/notification_page.dart';
 import 'package:inter_knot/helpers/page_transition_helper.dart';
@@ -19,15 +19,6 @@ class MyAppBar extends StatefulWidget {
 }
 
 class _MyAppBarState extends State<MyAppBar> {
-  Timer? _debounce;
-
-  void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(seconds: 1), () {
-      c.searchQuery(query);
-    });
-  }
-
   @override
   void initState() {
     super.initState();
@@ -35,7 +26,6 @@ class _MyAppBarState extends State<MyAppBar> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     super.dispose();
   }
 
@@ -99,88 +89,19 @@ class _MyAppBarState extends State<MyAppBar> {
                   ],
                 ),
                 const SizedBox(width: 12),
-                // 新增：搜索栏
+                // 搜索栏（支持历史 + 实时联想）
                 Expanded(
                   child: Padding(
                     padding:
                         EdgeInsets.symmetric(horizontal: isCompact ? 8 : 16),
                     child: Align(
                       alignment: Alignment.center,
-                      child: Container(
+                      child: ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: 700,
-                          maxHeight: isCompact ? 36 : 48,
+                          maxHeight: isCompact ? 36 : 40,
                         ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                        ),
-                        child: SearchBar(
-                          controller: c.searchController,
-                          onChanged: _onSearchChanged,
-                          onSubmitted: c.searchQuery.call,
-                          constraints: BoxConstraints(
-                            minHeight: isCompact ? 36 : 48,
-                            maxHeight: isCompact ? 36 : 48,
-                          ),
-                          padding: WidgetStatePropertyAll(
-                            EdgeInsets.symmetric(
-                                horizontal: isCompact ? 8 : 16),
-                          ),
-                          backgroundColor:
-                              const WidgetStatePropertyAll(Color(0xff1E1E1E)),
-                          leading: Padding(
-                            padding: EdgeInsets.only(left: isCompact ? 4 : 8),
-                            child: Icon(
-                              Icons.search,
-                              color: const Color(0xffB0B0B0),
-                              size: isCompact ? 20 : 24,
-                            ),
-                          ),
-                          hintText: '搜索',
-                          hintStyle: WidgetStatePropertyAll(
-                            TextStyle(
-                              color: const Color(0xff808080),
-                              fontSize: isCompact ? 14 : null,
-                            ),
-                          ),
-                          textStyle: WidgetStatePropertyAll(
-                            TextStyle(
-                              color: const Color(0xffE0E0E0),
-                              fontSize: isCompact ? 14 : null,
-                            ),
-                          ),
-                          side: WidgetStatePropertyAll(
-                            BorderSide(
-                              color: Colors.white.withValues(alpha: 0.1),
-                              width: 1,
-                            ),
-                          ),
-                          trailing: [
-                            AnimatedBuilder(
-                              animation: c.searchController,
-                              builder: (context, _) {
-                                final hasText =
-                                    c.searchController.text.trim().isNotEmpty;
-                                if (!hasText) return const SizedBox.shrink();
-
-                                return IconButton(
-                                  tooltip: '清除',
-                                  onPressed: () {
-                                    c.searchController.clear();
-                                    c.searchQuery('');
-                                    FocusManager.instance.primaryFocus
-                                        ?.unfocus();
-                                  },
-                                  icon: Icon(
-                                    Icons.close_rounded,
-                                    color: const Color(0xffB0B0B0),
-                                    size: isCompact ? 18 : 20,
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
+                        child: const SearchField(maxWidth: 700),
                       ),
                     ),
                   ),

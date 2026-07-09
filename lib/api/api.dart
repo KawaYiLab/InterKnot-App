@@ -14,6 +14,7 @@ import 'package:inter_knot/models/emote.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/models/mention_candidate.dart';
 import 'package:inter_knot/models/pagination.dart';
+import 'package:inter_knot/models/search_suggestion.dart';
 import 'package:inter_knot/controllers/data.dart';
 
 part 'api_auth.dart';
