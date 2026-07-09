@@ -1098,6 +1098,14 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
       return;
     }
 
+    _autoSaveDebounce?.cancel();
+    final inFlight = _saveDraftFuture;
+    if (inFlight != null) {
+      try {
+        await inFlight;
+      } catch (_) {}
+    }
+
     if (mounted) {
       setState(() {
         _isDeletingDraft = true;
@@ -1110,7 +1118,6 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
         throw Exception(_extractResponseMessage(res));
       }
 
-      _autoSaveDebounce?.cancel();
       await _refreshDraftEntries(silent: true);
 
       if (!mounted) {
@@ -1151,6 +1158,12 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
     }
 
     _autoSaveDebounce?.cancel();
+    final inFlight = _saveDraftFuture;
+    if (inFlight != null) {
+      try {
+        await inFlight;
+      } catch (_) {}
+    }
 
     if (mounted) {
       setState(() {
