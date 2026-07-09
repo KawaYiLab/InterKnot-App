@@ -23,8 +23,7 @@ String _authErrorMessage(Response res) {
 
 extension AuthApiExtensions on AuthApi {
   Future<({String? token, AuthorModel user})> login(
-      String email, String password,
-      {CaptchaPayload? captcha}) async {
+      String email, String password) async {
     final res = await post(
       '/api/auth/local',
       {'identifier': email, 'password': password},

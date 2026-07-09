@@ -9,9 +9,7 @@ import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/profile_dialogs.dart';
 import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
-import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/h_data.dart';
-import 'package:inter_knot/services/captcha_service.dart';
 import 'package:intl/intl.dart';
 
 class MyPageDesktop extends StatefulWidget {
@@ -378,9 +376,7 @@ class _MyPageDesktopState extends State<MyPageDesktop>
                     ? ElevatedButton(
                         onPressed: () async {
                           try {
-                            final captcha = await Get.find<CaptchaService>()
-                                .verifyIfNeeded(CaptchaScene.checkIn);
-                            final result = await api.checkIn(captcha: captcha);
+                            final result = await api.checkIn();
                             await c.refreshMyExp();
                             if (context.mounted) {
                               final rank = result.rank;
@@ -394,9 +390,7 @@ class _MyPageDesktopState extends State<MyPageDesktop>
                             if (context.mounted) {
                               String msg = e.toString();
                               if (e is ApiException) {
-                                msg = CaptchaService
-                                        .resolveErrorMessageFromException(e) ??
-                                    e.message;
+                                msg = e.message;
                                 if (e.statusCode == 409) {
                                   final details = e.details;
                                   String? checkInDay;

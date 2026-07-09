@@ -1,120 +1,6 @@
 part of 'api.dart';
 
 extension ProfileApi on Api {
-  Future<String?> findAuthorIdByName(String name) async {
-    final res = await get(
-      '/api/authors',
-      query: {
-        'filters[name][\$eq]': name,
-        'pagination[limit]': '1',
-      },
-    );
-
-    try {
-      final list = unwrapData<List<dynamic>>(res);
-      if (list.isNotEmpty) {
-        final first = list.first;
-        if (first is Map) {
-          return first['documentId'] as String?;
-        }
-      }
-    } catch (e) {
-      debugPrint('FindAuthor Error: $e');
-    }
-    return null;
-  }
-
-
-  Future<String?> createAuthor({
-    required String name,
-    String? userId,
-    bool ensureUniqueSlug = false,
-  }) async {
-    final slug = _slugify(name, ensureUnique: ensureUniqueSlug);
-    final res = await post(
-      '/api/authors',
-      {
-        'data': {
-          'name': name,
-          'slug': slug,
-        },
-      },
-    );
-
-    if (res.hasError) {
-      // Simple retry logic for slug conflict if needed,
-      // but strictly we should check the error message.
-      if (res.bodyString?.contains('unique') == true) {
-        debugPrint('Slug conflict detected, retrying find by name');
-        await Future.delayed(const Duration(milliseconds: 300));
-        return await findAuthorIdByName(name);
-      }
-    }
-
-    try {
-      final data = unwrapData<Map<String, dynamic>>(res);
-      return data['documentId'] as String?;
-    } catch (e) {
-      debugPrint('CreateAuthor Error: $e');
-      return null;
-    }
-  }
-
-
-  Future<void> linkAuthorToUser({
-    required String authorId,
-    required String userId,
-  }) async {
-    final res = await put(
-      '/api/authors/$authorId',
-      {
-        'data': {
-          'user': _coerceId(userId),
-        },
-      },
-    );
-    if (res.hasError) {
-      debugPrint('UpdateAuthor Error: ${res.bodyString}');
-    }
-  }
-
-
-  Future<void> updateAuthor({
-    required String authorId,
-    required Map<String, dynamic> data,
-  }) async {
-    final res = await put(
-      '/api/authors/$authorId',
-      {'data': data},
-    );
-    if (res.hasError) {
-      debugPrint('UpdateAuthorGeneric Error: ${res.bodyString}');
-      throw ApiException(res.statusText ?? 'Update author failed');
-    }
-  }
-
-
-  Future<String?> ensureAuthorId({
-    required String name,
-    String? userId,
-  }) async {
-    var existingId = await findAuthorIdByName(name);
-    if (existingId != null && existingId.isNotEmpty) return existingId;
-
-    // Exponential backoff
-    int delay = 200;
-    for (int i = 0; i < 3; i++) {
-      await Future.delayed(Duration(milliseconds: delay));
-      existingId = await findAuthorIdByName(name);
-      if (existingId != null && existingId.isNotEmpty) return existingId;
-      delay *= 2; // 200, 400, 800
-    }
-
-    debugPrint('Warning: Author not found after retries, creating as fallback');
-    return createAuthor(name: name, ensureUniqueSlug: true);
-  }
-
-
   Future<AuthorModel> getSelfUserInfo(String login) async {
     // /api/users/me returns the user directly
     final res = await get(
@@ -123,36 +9,23 @@ extension ProfileApi on Api {
     );
 
     final data = unwrapData<Map<String, dynamic>>(res);
+    // /api/users/me 不带 author 关联，避免 fromJson 回退到 user documentId
+    data.remove('documentId');
     final user = AuthorModel.fromJson(data);
+    try {
+      final profile = await getMyProfile();
+      final author = profile['author'];
+      final id = author is Map ? author['documentId']?.toString() : null;
+      if (id != null && id.isNotEmpty) {
+        user.authorId = id;
+      }
+    } catch (_) {
+      // author 关联获取失败时保持为空，后续 ensureAuthorForUser 会重试。
+    }
     await _fetchAndSetAvatar(user);
     return user;
   }
 
-
-  Future<AuthorModel> updateUser(
-      String userId, Map<String, dynamic> data) async {
-    final res = await put(
-      '/api/users/$userId',
-      data,
-    );
-
-    final body = unwrapData<Map<String, dynamic>>(res);
-    final user = AuthorModel.fromJson(body);
-    return user;
-  }
-
-
-  Future<AuthorModel> getUserInfo(String username) async {
-    final res = await get(
-      '/api/profiles/$username',
-      query: {'populate': '*'},
-    );
-
-    final body = unwrapData<Map<String, dynamic>>(res);
-    final user = AuthorModel.fromJson(body);
-    await _fetchAndSetAvatar(user);
-    return user;
-  }
 
   Future<String?> getAuthorAvatarUrl(String authorId) async {
     final res = await get(

@@ -98,7 +98,6 @@ extension CommentApi on Api {
     String body, {
     String? authorId,
     String? parentId,
-    CaptchaPayload? captcha,
   }) {
     if (discussionId.isEmpty) {
       throw ApiException('Discussion ID cannot be empty');
@@ -116,7 +115,7 @@ extension CommentApi on Api {
 
     return post(
       '/api/comments',
-      _withCaptcha({'data': data}, captcha),
+      {'data': data},
     );
   }
 

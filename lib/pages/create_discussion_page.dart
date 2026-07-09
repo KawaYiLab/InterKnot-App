@@ -18,7 +18,6 @@ import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/helpers/upload_task.dart';
 
-import 'package:inter_knot/models/captcha.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:markdown_quill/markdown_quill.dart';
 
@@ -33,7 +32,6 @@ import 'package:inter_knot/pages/create_discussion/create_discussion_post_settin
 
 import 'package:inter_knot/models/discussion.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:inter_knot/services/captcha_service.dart';
 
 class CreateDiscussionPage extends StatefulWidget {
   const CreateDiscussionPage({
@@ -285,11 +283,6 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   String _extractResponseMessage(Response<Map<String, dynamic>> res) {
     final body = res.body;
     if (body != null) {
-      final resolved = CaptchaService.resolveErrorMessageFromBody(body);
-      if (resolved != null && resolved.isNotEmpty) {
-        return resolved;
-      }
-
       final error = body['error'];
       if (error is Map) {
         final message = error['message']?.toString();
@@ -1213,28 +1206,7 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
         throw Exception('草稿保存成功后仍缺少 documentId');
       }
 
-      final captchaService = Get.find<CaptchaService>();
-      CaptchaPayload? captcha = await captchaService.verifyForArticlePublish();
-
-      var res = await api.publishArticleDraft(
-        id: documentId,
-        captcha: captcha,
-      );
-
-      if (res.hasError &&
-          CaptchaService.isCaptchaRequiredResponse(
-            res.body,
-            expectedScene: CaptchaScene.articlePublish,
-          )) {
-        captcha = await captchaService.verifyForRequiredResponse(
-          fallbackScene: CaptchaScene.articlePublish,
-          body: res.body,
-        );
-        res = await api.publishArticleDraft(
-          id: documentId,
-          captcha: captcha,
-        );
-      }
+      final res = await api.publishArticleDraft(id: documentId);
 
       if (res.hasError) {
         throw Exception(_extractResponseMessage(res));

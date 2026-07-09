@@ -62,7 +62,6 @@ class Controller extends GetxController {
   final unreadNotificationCount = 0.obs;
 
   final bookmarks = <HDataModel>{}.obs;
-  final favoriteIds = <String, String>{}.obs;
   final history = <HDataModel>{}.obs;
   static const String _historyKey = 'history';
   static const String _localReadCacheKey = 'local_read_cache';
@@ -236,7 +235,6 @@ class Controller extends GetxController {
     await box.remove('access_token');
     await box.remove('userId');
     bookmarks.clear();
-    favoriteIds.clear();
     _localReadCache.clear();
     _localViewCache.clear();
     await box.remove(_localReadCacheKey);
@@ -724,13 +722,11 @@ class Controller extends GetxController {
     final username = user.value?.login ?? '';
     if (isLogin.isFalse || username.isEmpty) {
       bookmarks.clear();
-      favoriteIds.clear();
       return;
     }
 
     final result = await api.getFavorites(username, '');
     bookmarks(result.items.toSet());
-    favoriteIds.assignAll(result.favoriteIds);
   }
 
   Future<void> toggleFavorite(HDataModel hData) async {
@@ -738,47 +734,19 @@ class Controller extends GetxController {
       showToast('请先登录', isError: true);
       return;
     }
-    final userId = user.value?.userId;
-    final username = user.value?.login ?? '';
-    if (userId == null || userId.isEmpty || username.isEmpty) {
-      showToast('用户信息获取失败', isError: true);
-      return;
-    }
 
     final articleId = hData.id;
     if (articleId.isEmpty) return;
 
-    var favoriteId = favoriteIds[articleId];
-    if (favoriteId == null) {
-      favoriteId = await api.getFavoriteId(
-        username: username,
-        articleId: articleId,
-      );
-      if (favoriteId != null && favoriteId.isNotEmpty) {
-        favoriteIds[articleId] = favoriteId;
+    try {
+      final result = await api.toggleFavorite(articleId);
+      if (result.favorited) {
         bookmarks({hData, ...bookmarks});
-      }
-    }
-
-    if (favoriteId != null && favoriteId.isNotEmpty) {
-      final ok = await api.deleteFavorite(favoriteId);
-      if (ok) {
-        favoriteIds.remove(articleId);
+      } else {
         bookmarks.removeWhere((e) => e.id == articleId);
-      } else {
-        showToast('取消收藏失败', isError: true);
       }
-    } else {
-      final newId = await api.createFavorite(
-        userId: userId,
-        articleId: articleId,
-      );
-      if (newId != null && newId.isNotEmpty) {
-        favoriteIds[articleId] = newId;
-        bookmarks({hData, ...bookmarks});
-      } else {
-        showToast('收藏失败', isError: true);
-      }
+    } catch (e) {
+      showToast('收藏操作失败: $e', isError: true);
     }
   }
 
@@ -912,23 +880,20 @@ class Controller extends GetxController {
       authorId.value = u.authorId;
       return u.authorId;
     }
-    final name = (u.name.isNotEmpty ? u.name : u.login).trim();
-    if (name.isEmpty) return null;
-    final id = await api.ensureAuthorId(
-      name: name,
-      userId: u.userId,
-    );
-    if (id != null && id.isNotEmpty) {
-      authorId.value = id;
-      if (u.userId != null && u.userId!.isNotEmpty) {
-        try {
-          await api.linkAuthorToUser(authorId: id, userId: u.userId!);
-        } catch (_) {
-          // Best-effort linking; avoid blocking login flow.
-        }
+    // 后端在用户创建时自动创建 author，这里从 /api/me/profile 读回关联的 author。
+    try {
+      final profile = await api.getMyProfile();
+      final author = profile['author'];
+      final id = author is Map ? author['documentId']?.toString() : null;
+      if (id != null && id.isNotEmpty) {
+        authorId.value = id;
+        u.authorId = id;
+        return id;
       }
+    } catch (e) {
+      logger.w('Failed to resolve author from /me/profile', error: e);
     }
-    return id;
+    return null;
   }
 
   Future<bool> ensureLogin() async {
@@ -967,17 +932,8 @@ class Controller extends GetxController {
 
     isUploadingAvatar(true);
     try {
-      final curUser = user.value;
-      final targetAuthorId = authorId.value ??
-          curUser?.authorId ??
-          await ensureAuthorForUser(curUser);
-      if (targetAuthorId == null || targetAuthorId.isEmpty) {
-        throw Exception('未找到作者信息');
-      }
-
       final bytes = await file.readAsBytes();
       final avatarUrl = await api.uploadAvatar(
-        authorId: targetAuthorId,
         bytes: bytes,
         filename: file.name,
       );
@@ -1088,29 +1044,13 @@ class Controller extends GetxController {
     if (curUser.login == newName) return;
 
     try {
-      // 1. Update User (username)
-      final updatedUser = await api.updateUser(
-        curUser.userId!,
-        {'username': newName},
-      );
+      // 后端统一改名入口（同时更新 user.username 与 author.name，扣除丁尼）
+      final resultName = await api.updateMyName(newName);
 
-      // 2. Update Author (name) if exists
-      final authorIdVal = authorId.value ?? curUser.authorId;
-      if (authorIdVal != null && authorIdVal.isNotEmpty) {
-        try {
-          await api.updateAuthor(
-            authorId: authorIdVal,
-            data: {'name': newName},
-          );
-        } catch (e) {
-          logger.w('Failed to update Author name', error: e);
-        }
-      }
-
-      // 3. Update local state
-      updatedUser.avatar = curUser.avatar;
-      user(updatedUser);
-      await ensureAuthorForUser(updatedUser);
+      curUser.name = resultName;
+      curUser.login = resultName;
+      user.refresh();
+      await refreshSelfUserInfo();
 
       showToast('用户名已更新');
     } catch (e) {
