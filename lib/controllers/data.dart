@@ -472,7 +472,9 @@ class Controller extends GetxController {
     discussion.isRead = true;
     _localReadCache[id] = true;
 
-    final nextViews = serverViews != null ? serverViews : discussion.views + 1;
+    final nextViews = serverViews != null
+        ? (serverViews > discussion.views ? serverViews : discussion.views)
+        : discussion.views + 1;
     discussion.views = nextViews;
 
     final cachedViews = _localViewCache[id];
