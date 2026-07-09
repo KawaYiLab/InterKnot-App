@@ -10,6 +10,7 @@ import 'package:inter_knot/models/author.dart';
 import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
+import 'package:inter_knot/models/emote.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/models/pagination.dart';
 import 'package:inter_knot/controllers/data.dart';

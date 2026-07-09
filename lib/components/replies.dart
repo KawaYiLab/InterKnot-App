@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/my_chip.dart';
+import 'package:inter_knot/components/rich_text/ik_content_text.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/components/image_viewer.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/time_formatter.dart';
+import 'package:inter_knot/pages/profile_page.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
-import 'package:inter_knot/pages/profile_page.dart';
 
 class Replies extends StatefulWidget {
   const Replies({
@@ -67,6 +67,39 @@ class _RepliesState extends State<Replies> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildImageGrid(BuildContext context, List<String> images) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: images.asMap().entries.map((entry) {
+        final index = entry.key;
+        final url = entry.value;
+        return GestureDetector(
+          onTap: () => ImageViewer.show(
+            context,
+            imageUrls: images,
+            initialIndex: index,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              url,
+              width: 96,
+              height: 96,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 96,
+                height: 96,
+                color: Colors.grey[800],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -202,21 +235,28 @@ class _RepliesState extends State<Replies> {
                       children: [
                         const SizedBox(height: 8),
                         SelectionArea(
-                          child: HtmlWidget(
-                            reply.bodyHTML,
-                            textStyle: const TextStyle(
+                          child: IkContentText(
+                            reply.rawBodyText,
+                            style: const TextStyle(
                               fontSize: 16,
                               color:
                                   Color(0xffE0E0E0), // Light grey for replies
                             ),
-                            onTapImage: (data) {
-                              if (data.sources.isEmpty) return;
-                              final url = data.sources.first.url;
-                              ImageViewer.show(context,
-                                  imageUrls: [url], heroTagPrefix: null);
+                            onMentionTap: (authorDocumentId) {
+                              if (authorDocumentId.isEmpty) return;
+                              showZZZDialog(
+                                context: context,
+                                pageBuilder: (_) => ProfilePage(
+                                  authorDocumentId: authorDocumentId,
+                                ),
+                              );
                             },
                           ),
                         ),
+                        if (reply.images.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          _buildImageGrid(context, reply.images),
+                        ],
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -453,21 +493,28 @@ class _RepliesState extends State<Replies> {
           Padding(
             padding: const EdgeInsets.only(left: 0, top: 8),
             child: SelectionArea(
-              child: HtmlWidget(
-                reply.bodyHTML,
-                textStyle: const TextStyle(
+              child: IkContentText(
+                reply.rawBodyText,
+                style: const TextStyle(
                   fontSize: 16,
                   color: Color(0xffE0E0E0),
                 ),
-                onTapImage: (data) {
-                  if (data.sources.isEmpty) return;
-                  final url = data.sources.first.url;
-                  ImageViewer.show(context,
-                      imageUrls: [url], heroTagPrefix: null);
+                onMentionTap: (authorDocumentId) {
+                  if (authorDocumentId.isEmpty) return;
+                  showZZZDialog(
+                    context: context,
+                    pageBuilder: (_) => ProfilePage(
+                      authorDocumentId: authorDocumentId,
+                    ),
+                  );
                 },
               ),
             ),
           ),
+          if (reply.images.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _buildImageGrid(context, reply.images),
+          ],
           const SizedBox(height: 8),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,

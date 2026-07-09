@@ -72,6 +72,7 @@ List<String> _extractImages(dynamic raw) {
 class CommentModel {
   final AuthorModel author;
   final String bodyHTML;
+  final String rawBodyText;
   final DateTime createdAt;
   final DateTime? lastEditedAt;
   final replies = <CommentModel>{};
@@ -86,6 +87,7 @@ class CommentModel {
   CommentModel({
     required this.author,
     required this.bodyHTML,
+    required this.rawBodyText,
     required this.createdAt,
     required this.lastEditedAt,
     required Iterable<CommentModel> replies,
@@ -106,6 +108,7 @@ class CommentModel {
         json['content'] as String? ?? json['bodyHTML'] as String? ?? '';
     final normalized = normalizeMarkdown(content);
     final (:cover, :html) = parseHtml(normalized, true);
+    final rawBodyText = normalized;
 
     final repliesData = json['replies'];
     final repliesList = <CommentModel>[];
@@ -127,6 +130,7 @@ class CommentModel {
     return CommentModel(
       author: AuthorModel.fromJson(json['author'] as Map<String, dynamic>),
       bodyHTML: html,
+      rawBodyText: rawBodyText,
       createdAt: DateTime.parse(json['createdAt'] as String),
       lastEditedAt:
           (json['updatedAt'] as String?).use((v) => DateTime.parse(v)),
