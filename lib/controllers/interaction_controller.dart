@@ -363,9 +363,7 @@ class InteractionController extends GetxController {
   }
 
   void _showTripleResultToast(bool coinGiven, String coinReason) {
-    if (coinGiven ||
-        coinReason == 'GIVEN' ||
-        coinReason == 'ALREADY_GIVEN') {
+    if (coinGiven || coinReason == 'ALREADY_GIVEN') {
       showToast('三连成功！');
       return;
     }
