@@ -99,7 +99,10 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     setState(() {
       _parentId = parentId;
       _replyToUser = userName;
-      _replyToAuthorId = authorDocumentId;
+      _replyToAuthorId =
+          (authorDocumentId != null && authorDocumentId.isNotEmpty)
+              ? authorDocumentId
+              : null;
       _isWriting = true;
       _addReplyPrefix = addPrefix;
     });
