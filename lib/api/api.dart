@@ -12,6 +12,7 @@ import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/emote.dart';
 import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/models/mention_candidate.dart';
 import 'package:inter_knot/models/pagination.dart';
 import 'package:inter_knot/controllers/data.dart';
 
@@ -31,6 +32,7 @@ part 'api_denny.dart';
 part 'api_follow.dart';
 part 'api_exam.dart';
 part 'api_emote.dart';
+part 'api_search.dart';
 part 'api_report.dart';
 part 'api_presence.dart';
 

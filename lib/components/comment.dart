@@ -30,8 +30,12 @@ class Comment extends StatefulWidget {
 
   final DiscussionModel discussion;
   final bool loading;
-  final void Function(String parentId, String? userName, {bool addPrefix})?
-      onReply;
+  final void Function(
+    String parentId,
+    String? userName, {
+    bool addPrefix,
+    String? authorDocumentId,
+  })? onReply;
 
   final bool useListView;
   final ScrollController? controller;
@@ -373,8 +377,11 @@ class _CommentState extends State<Comment> {
                   const SizedBox(width: 8),
                   TextButton(
                     onPressed: () => widget.onReply?.call(
-                        comment.id, comment.author.name,
-                        addPrefix: false),
+                      comment.id,
+                      comment.author.name,
+                      addPrefix: false,
+                      authorDocumentId: comment.author.authorId,
+                    ),
                     style: ButtonStyle(
                       padding: WidgetStateProperty.all(EdgeInsets.zero),
                       minimumSize: WidgetStateProperty.all(Size.zero),
@@ -454,8 +461,18 @@ class _CommentState extends State<Comment> {
                       alignment: 0.0,
                     );
                   },
-                  onReply: (id, userName, {addPrefix = false}) =>
-                      widget.onReply?.call(id, userName, addPrefix: addPrefix)),
+                  onReply: (
+                          id,
+                          userName, {
+                          addPrefix = false,
+                          authorDocumentId,
+                        }) =>
+                      widget.onReply?.call(
+                        id,
+                        userName,
+                        addPrefix: addPrefix,
+                        authorDocumentId: authorDocumentId,
+                      )),
             ],
           ),
         );
@@ -655,6 +672,7 @@ class _CommentState extends State<Comment> {
                               comment.id,
                               comment.author.name,
                               addPrefix: false,
+                              authorDocumentId: comment.author.authorId,
                             ),
                             style: ButtonStyle(
                               padding: WidgetStateProperty.all(EdgeInsets.zero),
@@ -744,8 +762,18 @@ class _CommentState extends State<Comment> {
                       alignment: 0.0,
                     );
                   },
-                  onReply: (id, userName, {addPrefix = false}) =>
-                      widget.onReply?.call(id, userName, addPrefix: addPrefix),
+                  onReply: (
+                          id,
+                          userName, {
+                          addPrefix = false,
+                          authorDocumentId,
+                        }) =>
+                      widget.onReply?.call(
+                        id,
+                        userName,
+                        addPrefix: addPrefix,
+                        authorDocumentId: authorDocumentId,
+                      ),
                 ),
               ],
             ),

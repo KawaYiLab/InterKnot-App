@@ -373,15 +373,20 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                                             widget.discussion,
                                                         isInitialLoading:
                                                             _isInitialLoading,
-                                                        onReply: (id, userName,
-                                                                {addPrefix =
-                                                                    false}) =>
+                                                        onReply: (
+                                                          id,
+                                                          userName, {
+                                                          addPrefix = false,
+                                                          authorDocumentId,
+                                                        }) =>
                                                             actionButtonsKey
                                                                 .currentState
                                                                 ?.replyTo(
                                                           id,
                                                           userName,
                                                           addPrefix: addPrefix,
+                                                          authorDocumentId:
+                                                              authorDocumentId,
                                                         ),
                                                       ),
                                                     ],

@@ -98,19 +98,21 @@ extension CommentApi on Api {
     String body, {
     String? authorId,
     String? parentId,
+    List<String>? imageIds,
   }) {
     if (discussionId.isEmpty) {
       throw ApiException('Discussion ID cannot be empty');
     }
 
     debugPrint(
-        'Adding comment to discussion: $discussionId, author: $authorId, parent: $parentId');
+        'Adding comment to discussion: $discussionId, author: $authorId, parent: $parentId, images: $imageIds');
 
     final data = <String, dynamic>{
       'article': discussionId,
       'content': body,
       if (authorId != null && authorId.isNotEmpty) 'author': authorId,
       if (parentId != null && parentId.isNotEmpty) 'parent': parentId,
+      if (imageIds != null && imageIds.isNotEmpty) 'images': imageIds,
     };
 
     return post(
