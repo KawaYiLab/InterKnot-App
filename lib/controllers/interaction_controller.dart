@@ -219,8 +219,10 @@ class InteractionController extends GetxController {
     final oldLikesCount = discussion.likesCount;
     final oldHDataLiked = hData.liked;
     final oldHDataLikesCount = hData.likesCount;
-    final oldFavorited = hData.favorited;
-    final oldFavoritesCount = hData.favoritesCount;
+    final oldFavorited = discussion.favorited;
+    final oldFavoritesCount = discussion.favoritesCount;
+    final oldHDataFavorited = hData.favorited;
+    final oldHDataFavoritesCount = hData.favoritesCount;
     final oldDennyCount = discussion.dennyCount;
     final oldHasGivenDenny = discussion.hasGivenDenny;
 
@@ -229,8 +231,10 @@ class InteractionController extends GetxController {
     if (!oldLiked) discussion.likesCount++;
     hData.liked = true;
     if (!oldHDataLiked) hData.likesCount++;
+    discussion.favorited = true;
+    if (!oldFavorited) discussion.favoritesCount++;
     hData.favorited = true;
-    if (!oldFavorited) hData.favoritesCount++;
+    if (!oldHDataFavorited) hData.favoritesCount++;
     if (!oldHasGivenDenny) {
       discussion.hasGivenDenny = true;
       discussion.dennyCount++;
@@ -241,8 +245,8 @@ class InteractionController extends GetxController {
     if (cached != null && cached != discussion) {
       cached.liked = hData.liked;
       cached.likesCount = hData.likesCount;
-      cached.favorited = hData.favorited;
-      cached.favoritesCount = hData.favoritesCount;
+      cached.favorited = discussion.favorited;
+      cached.favoritesCount = discussion.favoritesCount;
       cached.dennyCount = discussion.dennyCount;
       cached.hasGivenDenny = discussion.hasGivenDenny;
     }
@@ -266,6 +270,8 @@ class InteractionController extends GetxController {
       discussion.likesCount = result.likesCount;
       hData.liked = result.liked;
       hData.likesCount = result.likesCount;
+      discussion.favorited = result.favorited;
+      discussion.favoritesCount = result.favoritesCount;
       hData.favorited = result.favorited;
       hData.favoritesCount = result.favoritesCount;
       discussion.dennyCount = result.dennyCount;
@@ -290,8 +296,8 @@ class InteractionController extends GetxController {
       if (cached != null) {
         cached.liked = hData.liked;
         cached.likesCount = hData.likesCount;
-        cached.favorited = hData.favorited;
-        cached.favoritesCount = hData.favoritesCount;
+        cached.favorited = discussion.favorited;
+        cached.favoritesCount = discussion.favoritesCount;
         cached.dennyCount = discussion.dennyCount;
         cached.hasGivenDenny = discussion.hasGivenDenny;
         HDataModel.upsertCachedDiscussion(cached);
@@ -308,12 +314,14 @@ class InteractionController extends GetxController {
       discussion.likesCount = oldLikesCount;
       hData.liked = oldHDataLiked;
       hData.likesCount = oldHDataLikesCount;
-      hData.favorited = oldFavorited;
-      hData.favoritesCount = oldFavoritesCount;
+      discussion.favorited = oldFavorited;
+      discussion.favoritesCount = oldFavoritesCount;
+      hData.favorited = oldHDataFavorited;
+      hData.favoritesCount = oldHDataFavoritesCount;
       discussion.dennyCount = oldDennyCount;
       discussion.hasGivenDenny = oldHasGivenDenny;
 
-      if (oldFavorited) {
+      if (oldHDataFavorited) {
         if (!bookmarks.any((e) => e.id == articleId)) bookmarks.add(hData);
       } else {
         bookmarks.removeWhere((e) => e.id == articleId);
