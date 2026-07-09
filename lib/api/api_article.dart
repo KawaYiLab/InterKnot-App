@@ -438,6 +438,11 @@ extension ArticleApi on Api {
   }
 
 
+  Future<Response<Map<String, dynamic>>> discardArticleDraft(String id) {
+    return post('/api/articles/$id/discard-draft', {});
+  }
+
+
   Future<Response<Map<String, dynamic>>> unpublishArticleDraft(
     String id, {
     bool discardDraft = false,

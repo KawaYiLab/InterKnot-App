@@ -8,17 +8,22 @@ class CreateDiscussionDesktopFooter extends StatelessWidget {
     required this.isPublishing,
     required this.onSubmit,
     this.isDeletingDraft = false,
+    this.isDiscardingChanges = false,
     this.submitEnabled = true,
     this.showCompressionToggle = false,
     this.compressBeforeUpload = true,
     this.onCompressionChanged,
     this.showDeleteButton = false,
     this.onDeleteDraft,
+    this.showDiscardButton = false,
+    this.onDiscard,
+    this.isEditingPublished = false,
   });
 
   final bool isSavingDraft;
   final bool isPublishing;
   final bool isDeletingDraft;
+  final bool isDiscardingChanges;
   final VoidCallback onSubmit;
   final bool submitEnabled;
   final bool showCompressionToggle;
@@ -26,18 +31,22 @@ class CreateDiscussionDesktopFooter extends StatelessWidget {
   final ValueChanged<bool>? onCompressionChanged;
   final bool showDeleteButton;
   final VoidCallback? onDeleteDraft;
+  final bool showDiscardButton;
+  final VoidCallback? onDiscard;
+  final bool isEditingPublished;
 
   @override
   Widget build(BuildContext context) {
-    final isBusy = isSavingDraft || isPublishing || isDeletingDraft;
+    final isBusy = isSavingDraft || isPublishing || isDeletingDraft || isDiscardingChanges;
     final buttonEnabled = submitEnabled && !isBusy;
     final buttonLabel = isPublishing
-        ? '发布中'
+        ? isEditingPublished ? '更新中' : '发布中'
         : isSavingDraft
-            ? '保存草稿中'
-            : '发布';
-    final buttonIcon = isSavingDraft ? Icons.save_outlined : Icons.add;
+            ? isEditingPublished ? '保存中' : '保存草稿中'
+            : isEditingPublished ? '更新帖子' : '发布';
+    final buttonIcon = isSavingDraft ? Icons.save_outlined : isEditingPublished ? Icons.check : Icons.add;
     final deleteEnabled = showDeleteButton && !isBusy && onDeleteDraft != null;
+    final discardEnabled = showDiscardButton && !isBusy && onDiscard != null;
 
     return Container(
       margin: const EdgeInsets.only(
@@ -83,6 +92,18 @@ class CreateDiscussionDesktopFooter extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (showDiscardButton) ...[
+                ZzzDesktopActionButton(
+                  icon: Icons.undo_outlined,
+                  label: isDiscardingChanges ? '恢复中' : '放弃修改',
+                  width: 188,
+                  tone: ZzzDesktopActionButtonTone.danger,
+                  enabled: discardEnabled,
+                  isLoading: isDiscardingChanges,
+                  onTap: discardEnabled ? () => onDiscard?.call() : null,
+                ),
+                const SizedBox(width: 12),
+              ],
               if (showDeleteButton) ...[
                 ZzzDesktopActionButton(
                   icon: Icons.delete_outline,

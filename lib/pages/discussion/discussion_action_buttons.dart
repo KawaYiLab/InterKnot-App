@@ -424,11 +424,14 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   }
 
   Future<void> _handleDelete() async {
+    final isPublished = !widget.discussion.isEditableDraft;
     final confirmed = await showDeleteConfirmDialog(
       context: context,
       title: '确认删除',
-      message: '确定要删除这个帖子吗？此操作不可恢复。',
-      width: 300,
+      message: isPublished
+          ? '删除已发布的帖子将扣除 10 丁尼，确定要继续吗？'
+          : '确定要删除这个帖子吗？此操作不可恢复。',
+      width: 320,
     );
 
     if (confirmed == true) {
@@ -437,9 +440,17 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
         if (res.hasError) {
           showToast('删除失败: ${res.statusText}', isError: true);
         } else {
+          final body = res.body;
+          final newBalance = body is Map<String, dynamic>
+              ? (body['newBalance'] as num?)?.toInt()
+              : null;
+          if (newBalance != null) {
+            c.user.value?.denny = newBalance;
+            c.user.refresh();
+          }
           if (!mounted) return;
           Navigator.of(context).pop(true);
-          showToast('帖子已删除');
+          showToast(isPublished ? '帖子已删除，扣除 10 丁尼' : '帖子已删除');
           c.searchResult.refresh();
           c.bookmarks.refresh();
           c.history.refresh();
@@ -458,6 +469,34 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     );
     if (result == true) {
       widget.onEditSuccess?.call();
+    }
+  }
+
+  Future<void> _handleUnpublish() async {
+    final confirmed = await showDeleteConfirmDialog(
+      context: context,
+      title: '确认撤稿',
+      message: '撤稿后帖子将不再公开，但内容仍保留在草稿中。确定继续吗？',
+      confirmText: '撤稿',
+      width: 320,
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final res = await api.unpublishArticleDraft(widget.discussion.id);
+      if (res.hasError) {
+        showToast('撤稿失败: ${res.statusText}', isError: true);
+      } else {
+        if (!mounted) return;
+        showToast('已撤稿');
+        c.searchResult.refresh();
+        c.bookmarks.refresh();
+        c.history.refresh();
+        Navigator.of(context).pop(true);
+      }
+    } catch (e) {
+      showToast('撤稿出错: $e', isError: true);
     }
   }
 
@@ -794,6 +833,26 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                   }),
                   if (c.user.value?.login ==
                       widget.discussion.author.login) ...[
+                    if (!widget.discussion.isEditableDraft) ...[
+                      const SizedBox(width: 8),
+                      Tooltip(
+                        message: '撤稿',
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xff222222),
+                            borderRadius: BorderRadius.circular(maxRadius),
+                            border: Border.all(
+                                color: const Color(0xff2D2D2D), width: 4),
+                          ),
+                          child: ClickRegion(
+                            onTap: _handleUnpublish,
+                            child: const Icon(Icons.visibility_off,
+                                color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     Tooltip(
                       message: '编辑',

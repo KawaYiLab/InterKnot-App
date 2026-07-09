@@ -10,6 +10,7 @@ class AuthorModel {
   DateTime? createdAt;
   int? exp;
   int? level;
+  int? denny;
   String? lastCheckInDate;
   int? consecutiveCheckInDays;
   bool canCheckIn;
@@ -27,6 +28,7 @@ class AuthorModel {
     this.createdAt,
     this.exp,
     this.level,
+    this.denny,
     this.lastCheckInDate,
     this.consecutiveCheckInDays,
     this.canCheckIn = true,
@@ -126,6 +128,7 @@ class AuthorModel {
       createdAt: createdAt,
       exp: json['exp'] as int? ?? 0,
       level: json['level'] as int? ?? 1,
+      denny: json['denny'] as int?,
       lastCheckInDate: json['lastCheckInDate'] as String?,
       consecutiveCheckInDays: json['consecutiveCheckInDays'] as int?,
       canCheckIn: json['canCheckIn'] as bool? ?? true,
@@ -141,6 +144,7 @@ class AuthorModel {
       'documentId': authorId,
       'createdAt': createdAt?.toIso8601String(),
       'avatar': {'url': avatar},
+      if (denny != null) 'denny': denny,
     };
   }
 

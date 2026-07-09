@@ -10,6 +10,7 @@ class CreateDiscussionMobileNav extends StatelessWidget {
     required this.onSubmit,
     this.draftCount = 0,
     this.showDraftButton = true,
+    this.isEditingPublished = false,
   });
 
   final bool isSavingDraft;
@@ -19,6 +20,7 @@ class CreateDiscussionMobileNav extends StatelessWidget {
   final VoidCallback onSubmit;
   final int draftCount;
   final bool showDraftButton;
+  final bool isEditingPublished;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +84,9 @@ class CreateDiscussionMobileNav extends StatelessWidget {
                       Text(
                         isSavingDraft
                             ? '\u6b63\u5728\u4fdd\u5b58'
-                            : '\u53d1\u5e03',
+                            : isEditingPublished
+                                ? '\u66f4\u65b0\u5e16\u5b50'
+                                : '\u53d1\u5e03',
                         style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,

@@ -59,14 +59,10 @@ class _DiscussionPageState extends State<DiscussionPage> {
       final fullDiscussion =
           await Get.find<Api>().getArticleDetail(widget.discussion.id);
       if (mounted) {
-        // 先更新数据，不触发setState
         widget.discussion.updateFrom(fullDiscussion);
-        // 只更新加载状态，避免整个页面重建
-        if (_isDetailLoading) {
-          setState(() {
-            _isDetailLoading = false;
-          });
-        }
+        setState(() {
+          _isDetailLoading = false;
+        });
       }
     } catch (e) {
       logger.e('Failed to fetch article details', error: e);
@@ -350,8 +346,9 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                                   hData: widget.hData,
                                                   onCommentAdded:
                                                       _handleCommentAdded,
-                                                  onEditSuccess: () =>
-                                                      setState(() {}),
+                                                  onEditSuccess: () {
+                                                    _fetchArticleDetails();
+                                                  },
                                                 ),
                                               ),
                                               SliverToBoxAdapter(
@@ -414,7 +411,9 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                         onTap: _handleNewCommentNotificationTap,
                                       ),
                                       onCommentAdded: _handleCommentAdded,
-                                      onEditSuccess: () => setState(() {}),
+                                      onEditSuccess: () {
+                                        _fetchArticleDetails();
+                                      },
                                     );
                                   },
                                 ),
