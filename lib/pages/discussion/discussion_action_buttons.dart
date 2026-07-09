@@ -113,12 +113,22 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
         authorDocumentId != null &&
         authorDocumentId.isNotEmpty) {
       final token = buildMentionToken(userName, authorDocumentId);
-      final current = _textController.text;
+      final current = _stripLeadingMention(_textController.text);
       _textController.value = TextEditingValue(
         text: '$token $current',
         selection: TextSelection.collapsed(offset: token.length + 1),
       );
     }
+  }
+
+  String _stripLeadingMention(String text) {
+    final tokens = parseMentions(text);
+    if (tokens.isNotEmpty && tokens.first.start == 0) {
+      var tail = text.substring(tokens.first.end);
+      if (tail.startsWith(' ')) tail = tail.substring(1);
+      return tail;
+    }
+    return text;
   }
 
   @override
@@ -467,16 +477,19 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                         ? Image.network(
                             task.previewUrl!,
                             fit: BoxFit.cover,
-                            loadingBuilder: (_, __, ___) => const Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                            loadingBuilder: (_, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                             errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.broken_image,
                                     color: Colors.grey, size: 24),
