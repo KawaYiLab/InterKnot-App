@@ -376,28 +376,6 @@ class Cover extends StatelessWidget {
         discussion.coverImages.isNotEmpty ? discussion.coverImages.first : null;
     final highResUrl = coverImage?.url ?? discussion.cover;
 
-    Widget image;
-    if (highResUrl == null) {
-      image = Assets.images.defaultCover.image(
-        width: double.infinity,
-        fit: BoxFit.cover,
-      );
-    } else {
-      image = NetworkImageBox(
-        url: highResUrl,
-        fit: BoxFit.cover,
-        alignment: Alignment.topCenter,
-        filterQuality: FilterQuality.high,
-        gaplessPlayback: true,
-        preferHtmlElementOnWeb: true,
-        loadingBuilder: (context, progress) {
-          return const SizedBox.shrink();
-        },
-        errorBuilder: (context) =>
-            Assets.images.defaultCover.image(fit: BoxFit.cover),
-      );
-    }
-
     // Only use backend-provided dimensions for card height.
     final backendAspectRatio = switch ((coverImage?.width, coverImage?.height)) {
       (final int width?, final int height?) when width > 0 && height > 0 =>
@@ -408,16 +386,49 @@ class Cover extends StatelessWidget {
     final double clampedAspectRatio =
         displayAspectRatio < 0.75 ? 0.75 : displayAspectRatio;
 
-    return AspectRatio(
-      aspectRatio: clampedAspectRatio,
-      child: ClipRect(
-        child: AnimatedScale(
-          scale: isHovering ? 1.1 : 1.0,
-          duration: const Duration(milliseconds: 1200),
-          curve: Curves.easeOutCubic,
-          child: image,
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        final maxWidth = constraints.maxWidth;
+        final memCacheWidth = (maxWidth * dpr).ceil();
+        final memCacheHeight = (memCacheWidth / clampedAspectRatio).ceil();
+
+        Widget image;
+        if (highResUrl == null) {
+          image = Assets.images.defaultCover.image(
+            width: double.infinity,
+            fit: BoxFit.cover,
+          );
+        } else {
+          image = NetworkImageBox(
+            url: highResUrl,
+            fit: BoxFit.cover,
+            alignment: Alignment.topCenter,
+            filterQuality: FilterQuality.high,
+            gaplessPlayback: true,
+            preferHtmlElementOnWeb: true,
+            memCacheWidth: memCacheWidth,
+            memCacheHeight: memCacheHeight,
+            loadingBuilder: (context, progress) {
+              return const SizedBox.shrink();
+            },
+            errorBuilder: (context) =>
+                Assets.images.defaultCover.image(fit: BoxFit.cover),
+          );
+        }
+
+        return AspectRatio(
+          aspectRatio: clampedAspectRatio,
+          child: ClipRect(
+            child: AnimatedScale(
+              scale: isHovering ? 1.1 : 1.0,
+              duration: const Duration(milliseconds: 1200),
+              curve: Curves.easeOutCubic,
+              child: image,
+            ),
+          ),
+        );
+      },
     );
   }
 }

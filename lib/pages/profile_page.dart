@@ -9,6 +9,7 @@ import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/helpers/logger.dart';
+import 'package:inter_knot/helpers/share_helper.dart';
 import 'package:inter_knot/helpers/time_formatter.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/pages/discussion_page.dart';
@@ -183,6 +184,10 @@ class _ProfilePageState extends State<ProfilePage>
     } finally {
       if (mounted) setState(() => _isFollowingLoading = false);
     }
+  }
+
+  Future<void> _shareProfile() async {
+    await ShareHelper.shareProfile(widget.authorDocumentId);
   }
 
   Future<void> _reportUser() async {
@@ -771,6 +776,12 @@ class _ProfilePageState extends State<ProfilePage>
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Get.back(),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share, color: Colors.white70),
+            onPressed: _shareProfile,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -983,6 +994,11 @@ class _ProfilePageState extends State<ProfilePage>
                 ],
               ),
             ),
+            IconButton(
+              icon: const Icon(Icons.share, color: Colors.grey),
+              onPressed: _shareProfile,
+            ),
+            const SizedBox(width: 4),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.grey),
               onPressed: () => Get.back(),

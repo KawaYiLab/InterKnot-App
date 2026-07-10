@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -16,7 +17,8 @@ enum DownloadStatus {
 
 /// App update service for checking and downloading updates
 class UpdateService {
-  static const String versionCheckUrl = 'http://ik.tiwat.cn/app/android/version.json';
+  static const String _versionCheckUrlHttps = 'https://ik.tiwat.cn/app/android/version.json';
+  static const String _versionCheckUrlHttp = 'http://ik.tiwat.cn/app/android/version.json';
   
   // Global download state
   static DownloadStatus _downloadStatus = DownloadStatus.idle;
@@ -52,18 +54,39 @@ class UpdateService {
   static int _compareVersions(String v1, String v2) {
     final parts1 = v1.split('.').map((e) => int.tryParse(e) ?? 0).toList();
     final parts2 = v2.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    
+
     final maxLength = parts1.length > parts2.length ? parts1.length : parts2.length;
-    
+
     for (int i = 0; i < maxLength; i++) {
       final p1 = i < parts1.length ? parts1[i] : 0;
       final p2 = i < parts2.length ? parts2[i] : 0;
-      
+
       if (p1 < p2) return -1;
       if (p1 > p2) return 1;
     }
-    
+
     return 0;
+  }
+
+  /// Fetch version.json from server, with HTTPS → HTTP fallback and timeout.
+  static Future<http.Response?> _fetchVersionInfo() async {
+    Future<http.Response?> tryFetch(String url) async {
+      try {
+        final response = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 8));
+        if (response.statusCode == 200) return response;
+        debugPrint('UpdateService: Failed to fetch version from $url: ${response.statusCode}');
+      } on TimeoutException {
+        debugPrint('UpdateService: Timeout fetching $url');
+      } catch (e) {
+        debugPrint('UpdateService: Error fetching $url: $e');
+      }
+      return null;
+    }
+
+    return await tryFetch(_versionCheckUrlHttps) ??
+        await tryFetch(_versionCheckUrlHttp);
   }
   
   /// Check if there's a new version available
@@ -76,27 +99,36 @@ class UpdateService {
       
       debugPrint('UpdateService: Current version: $currentVersion ($currentVersionCode)');
       
-      // Fetch version info from server
-      final response = await http.get(Uri.parse(versionCheckUrl));
-      
-      if (response.statusCode != 200) {
-        debugPrint('UpdateService: Failed to fetch version info: ${response.statusCode}');
+      // Fetch version info from server with fallback and timeout
+      final response = await _fetchVersionInfo();
+
+      if (response == null) {
+        debugPrint('UpdateService: Failed to fetch version info from both HTTPS and HTTP endpoints');
         return null;
       }
-      
+
       final jsonData = json.decode(response.body) as Map<String, dynamic>;
-      final latestVersion = jsonData['version'] as String;
-      final latestVersionCode = jsonData['versionCode'] as int;
-      final downloadUrl = jsonData['downloadUrl'] as String;
-      final updateLog = jsonData['updateLog'] as String;
+      final latestVersion = jsonData['version']?.toString() ?? '';
+      final latestVersionCode =
+          int.tryParse(jsonData['versionCode']?.toString() ?? '') ?? 0;
+      final downloadUrl = jsonData['downloadUrl']?.toString() ?? '';
+      final updateLog = jsonData['updateLog']?.toString() ?? '';
       final forceUpdate = jsonData['forceUpdate'] as bool? ?? false;
-      final fileSize = jsonData['fileSize'] as String? ?? '';
-      
+      final fileSize = jsonData['fileSize']?.toString() ?? '';
+
+      if (latestVersion.isEmpty || downloadUrl.isEmpty) {
+        debugPrint('UpdateService: Invalid version info from server');
+        return null;
+      }
+
       debugPrint('UpdateService: Latest version: $latestVersion ($latestVersionCode)');
-      
-      // Compare versions using semantic versioning
-      final hasUpdate = _compareVersions(currentVersion, latestVersion) < 0;
-      
+
+      // Compare versions: prefer versionCode, fall back to semantic version string
+      final versionCodeHigher = latestVersionCode > currentVersionCode;
+      final versionStringHigher =
+          _compareVersions(currentVersion, latestVersion) < 0;
+      final hasUpdate = versionCodeHigher || versionStringHigher;
+
       if (hasUpdate) {
         final updateInfo = UpdateInfo(
           version: latestVersion,

@@ -312,13 +312,148 @@ extension MeApi on Api {
   }
 }
 
+/// 后端错误码/通用英文文案 → 中文用户提示
+const _apiErrorCodeMessages = {
+  // 通用 HTTP/Strapi 错误
+  'TOO_MANY_REQUESTS': '请求太频繁，请稍后再试',
+  'INTERNAL_SERVER_ERROR': '服务器内部错误，请稍后再试',
+  'REQUEST_ERROR': '请求失败，请稍后再试',
+  'UNAUTHORIZED': '请先登录',
+  'FORBIDDEN': '没有权限执行该操作',
+  'NOT_FOUND': '内容不存在或已被删除',
+  'BAD_REQUEST': '请求参数错误，请检查输入内容',
+  'PAYLOAD_TOO_LARGE': '请求内容过大',
+  'CONFLICT': '操作冲突，请稍后再试',
+  'NotFoundError': '内容不存在或已被删除',
+  'UnauthorizedError': '请先登录',
+  'ForbiddenError': '没有权限执行该操作',
+  'ValidationError': '请求参数错误，请检查输入内容',
+  'YupValidationError': '请求参数错误，请检查输入内容',
+  'ApplicationError': '请求失败，请稍后再试',
+  'RateLimitError': '请求太频繁，请稍后再试',
+  'PayloadTooLargeError': '请求内容过大',
+  'NotImplementedError': '该功能尚未实现',
+  // 考试相关
+  'EXAM_REQUIRED': '需要完成入站考试才能进行此操作',
+  'EXAM_COOLDOWN': '考试失败次数过多，请稍后再试',
+  'EXAM_NOT_AVAILABLE': '题库暂未配置，请稍后再试',
+  'EXAM_ATTEMPT_ID_REQUIRED': '缺少考试场次标识',
+  'EXAM_ATTEMPT_NOT_FOUND': '考试场次不存在',
+  'EXAM_ATTEMPT_ALREADY_SUBMITTED': '本场考试已提交',
+  'EXAM_ATTEMPT_EXPIRED': '考试已超时，请重新开始',
+  'EXAM_ALREADY_PASSED': '你已通过入站考试',
+  // 签到/丁尼/经济
+  'CHECK_IN_ALREADY_TODAY': '今日已签到',
+  'CHECK_IN_FAILED': '签到失败，请稍后再试',
+  'INSUFFICIENT_BALANCE': '丁尼余额不足',
+  'ALREADY_GIVEN': '已经投过币了',
+  'SELF_GIVE': '不能给自己的帖子投币',
+  'ANONYMOUS_ARTICLE': '匿名帖子不能投币',
+  'DEDUCT_FAILED': '扣除丁尼失败，请稍后再试',
+  // 关注/举报/资料
+  'ALREADY_FAVORITED': '已经收藏了',
+  'ALREADY_LIKED': '已经点赞了',
+  'CANNOT_FOLLOW_SELF': '不能关注自己',
+  'ALREADY_REPORTED': '已经举报过了，正在处理中',
+  'INVALID_TARGET': '举报目标无效',
+  'INVALID_TARGET_TYPE': '举报类型无效',
+  'INVALID_REASON': '举报原因无效',
+  'ARTICLE_NOT_FOUND': '帖子不存在或已被删除',
+  'COMMENT_NOT_FOUND': '评论不存在或已被删除',
+  'USER_NOT_FOUND': '用户不存在',
+  'AUTHOR_NOT_FOUND': '该用户不存在',
+  'PROFILE_NOT_FOUND': '作者资料不存在',
+  'EMAIL_ALREADY_TAKEN': '该邮箱已注册',
+  'REGISTER_DISABLED': '当前不允许注册',
+  'INVALID_EMAIL': '邮箱格式不正确',
+  'INVALID_PASSWORD': '密码长度不能少于 6 位',
+  'INVALID_VERIFICATION_CODE': '验证码必须是 6 位数字',
+  'REGISTER_CODE_NOT_FOUND': '验证码不存在或已失效',
+  'REGISTER_CODE_EXPIRED': '验证码已过期',
+  'REGISTER_CODE_TOO_MANY_ATTEMPTS': '验证码错误次数过多，请重新获取',
+  'REGISTER_CODE_INVALID': '验证码错误',
+  'RESET_CODE_NOT_FOUND': '验证码不存在或已失效',
+  'RESET_CODE_EXPIRED': '验证码已过期',
+  'RESET_CODE_TOO_MANY_ATTEMPTS': '验证码错误次数过多，请重新获取',
+  'RESET_CODE_INVALID': '验证码错误',
+};
+
+/// 通用英文提示文案 → 中文用户提示
+const _apiErrorMessageTranslations = {
+  'Internal server error': '服务器内部错误，请稍后再试',
+  'Request failed': '请求失败，请稍后再试',
+  'Not Found': '内容不存在或已被删除',
+  'Not found': '内容不存在或已被删除',
+  'Unauthorized': '请先登录',
+  'Forbidden': '没有权限执行该操作',
+  'Bad Request': '请求参数错误，请检查输入内容',
+  'Bad request': '请求参数错误，请检查输入内容',
+  'Too Many Requests': '请求太频繁，请稍后再试',
+  'Conflict': '操作冲突，请稍后再试',
+  'Rate limit exceeded. Please slow down.': '请求太频繁，请稍后再试',
+  'Already checked in today.': '今日已签到',
+  'Already checked in for the current check-in day.': '今日已签到',
+  'Invalid identifier or password': '账号或密码错误',
+  'Your account email is not confirmed': '账号邮箱未验证',
+  'Your account has been blocked by an administrator': '账号已被管理员禁用',
+  'Missing or invalid credentials': '缺少或无效的登录凭证',
+  'Author profile not found': '作者资料不存在',
+  'Author profile not found.': '作者资料不存在',
+  'Author not found': '该用户不存在',
+  'Author not found.': '该用户不存在',
+  'Target not found': '举报目标不存在',
+  'Target not found.': '举报目标不存在',
+  'Cannot follow yourself': '不能关注自己',
+  'Cannot follow yourself.': '不能关注自己',
+  'Author does not belong to you': '该作者不属于你',
+  'Author does not belong to you.': '该作者不属于你',
+  'Missing authorDocumentId': '缺少作者ID',
+  'Missing targetId': '缺少目标ID',
+  'Missing documentId': '缺少文档ID',
+  'Invalid targetType': '举报类型无效',
+  'Invalid reason': '举报原因无效',
+  'detail is required for reason "other"': '选择“其他”时需要填写详细说明',
+  'You cannot follow yourself': '不能关注自己',
+  'Already following': '已经关注过该用户',
+};
+
+bool _containsChinese(String text) {
+  // CJK Unified Ideographs range
+  return text.runes.any((r) => r >= 0x4e00 && r <= 0x9fff);
+}
+
 String? _errorMessageFromBody(dynamic body) {
-  if (body is Map) {
-    final error = body['error'];
-    if (error is Map && error['message'] != null) {
-      return error['message'].toString();
-    }
-    if (error is String && error.isNotEmpty) return error;
+  if (body is! Map) return null;
+  final error = body['error'];
+  if (error is String && error.isNotEmpty) {
+    return _apiErrorCodeMessages[error] ??
+        _apiErrorMessageTranslations[error] ??
+        error;
   }
+  if (error is! Map) return null;
+
+  final message = error['message']?.toString();
+  final code = error['code']?.toString();
+
+  // 1. 后端已返回中文业务提示，直接透传
+  if (message != null && message.isNotEmpty && _containsChinese(message)) {
+    return message;
+  }
+
+  // 2. 已知英文通用文案优先按完整消息映射
+  if (message != null && message.isNotEmpty) {
+    final translated = _apiErrorMessageTranslations[message];
+    if (translated != null) return translated;
+  }
+
+  // 3. 按 error.code 映射
+  if (code != null && code.isNotEmpty) {
+    final translated = _apiErrorCodeMessages[code];
+    if (translated != null) return translated;
+  }
+
+  // 4. 返回原始英文提示兜底
+  if (message != null && message.isNotEmpty) return message;
+  if (code != null && code.isNotEmpty) return code;
   return null;
 }

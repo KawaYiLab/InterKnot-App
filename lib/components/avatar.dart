@@ -17,6 +17,7 @@ class Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSrc = src != null && src!.trim().isNotEmpty;
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).ceil();
     final avatar = ClipOval(
       child: !hasSrc
           ? Assets.images.profilePhoto.image(
@@ -29,6 +30,10 @@ class Avatar extends StatelessWidget {
               width: size,
               height: size,
               fit: BoxFit.cover,
+              memCacheWidth: cacheSize,
+              memCacheHeight: cacheSize,
+              maxWidthDiskCache: cacheSize,
+              maxHeightDiskCache: cacheSize,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
               errorWidget: (context, url, error) =>

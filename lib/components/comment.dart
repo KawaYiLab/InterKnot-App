@@ -6,6 +6,7 @@ import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/image_viewer.dart';
 import 'package:inter_knot/components/my_chip.dart';
 import 'package:inter_knot/components/replies.dart';
+import 'package:inter_knot/components/report_sheet.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
@@ -69,6 +70,20 @@ class _CommentState extends State<Comment> {
       if (_removeFromReplies(reply.replies, id)) return true;
     }
     return false;
+  }
+
+  Future<void> _reportComment(CommentModel comment) async {
+    if (comment.id.isEmpty) {
+      showToast('评论ID无效', isError: true);
+      return;
+    }
+    if (!await c.ensureLogin()) return;
+    if (!mounted) return;
+    await showReportSheet(
+      context,
+      targetType: 'comment',
+      targetId: comment.id,
+    );
   }
 
   bool _removeCommentById(String id) {
@@ -412,34 +427,36 @@ class _CommentState extends State<Comment> {
                     final currentAuthorId = c.authorId.value ?? user?.authorId;
                     final isMe = currentAuthorId != null &&
                         currentAuthorId == comment.author.authorId;
-                    if (!isMe) return const SizedBox.shrink();
-
                     final deleting = _deletingCommentIds.contains(comment.id);
                     return Row(
                       children: [
                         const SizedBox(width: 8),
                         TextButton(
-                          onPressed:
-                              deleting ? null : () => _deleteComment(comment),
+                          onPressed: isMe
+                              ? (deleting ? null : () => _deleteComment(comment))
+                              : () => _reportComment(comment),
                           style: ButtonStyle(
                             padding: WidgetStateProperty.all(EdgeInsets.zero),
                             minimumSize: WidgetStateProperty.all(Size.zero),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             visualDensity: VisualDensity.compact,
-                            foregroundColor:
-                                WidgetStateProperty.all(Colors.redAccent),
+                            foregroundColor: WidgetStateProperty.all(
+                                isMe ? Colors.redAccent : Colors.orangeAccent),
                             overlayColor:
                                 WidgetStateProperty.resolveWith<Color?>(
                               (Set<WidgetState> states) {
                                 if (states.contains(WidgetState.hovered)) {
-                                  return Colors.red.withValues(alpha: 0.12);
+                                  return (isMe ? Colors.red : Colors.orange)
+                                      .withValues(alpha: 0.12);
                                 }
                                 return null;
                               },
                             ),
                           ),
                           child: Text(
-                            deleting ? '删除中...' : '删除',
+                            isMe
+                                ? (deleting ? '删除中...' : '删除')
+                                : '举报',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
@@ -709,35 +726,39 @@ class _CommentState extends State<Comment> {
                                 c.authorId.value ?? user?.authorId;
                             final isMe = currentAuthorId != null &&
                                 currentAuthorId == comment.author.authorId;
-                            if (!isMe) return const SizedBox.shrink();
 
                             final deleting = _deletingCommentIds.contains(
                               comment.id,
                             );
                             return TextButton(
-                              onPressed: deleting
-                                  ? null
-                                  : () => _deleteComment(comment),
+                              onPressed: isMe
+                                  ? (deleting
+                                      ? null
+                                      : () => _deleteComment(comment))
+                                  : () => _reportComment(comment),
                               style: ButtonStyle(
                                 padding:
                                     WidgetStateProperty.all(EdgeInsets.zero),
                                 minimumSize: WidgetStateProperty.all(Size.zero),
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 visualDensity: VisualDensity.compact,
-                                foregroundColor:
-                                    WidgetStateProperty.all(Colors.redAccent),
+                                foregroundColor: WidgetStateProperty.all(
+                                    isMe ? Colors.redAccent : Colors.orangeAccent),
                                 overlayColor:
                                     WidgetStateProperty.resolveWith<Color?>(
                                   (Set<WidgetState> states) {
                                     if (states.contains(WidgetState.hovered)) {
-                                      return Colors.red.withValues(alpha: 0.12);
+                                      return (isMe ? Colors.red : Colors.orange)
+                                          .withValues(alpha: 0.12);
                                     }
                                     return null;
                                   },
                                 ),
                               ),
                               child: Text(
-                                deleting ? '删除中...' : '删除',
+                                isMe
+                                    ? (deleting ? '删除中...' : '删除')
+                                    : '举报',
                                 style: const TextStyle(fontSize: 12),
                               ),
                             );
@@ -785,6 +806,8 @@ class _CommentState extends State<Comment> {
   }
 
   Widget _buildImageGrid(BuildContext context, List<String> images) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheSize = (96 * dpr).ceil();
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -803,6 +826,8 @@ class _CommentState extends State<Comment> {
               url,
               width: 96,
               height: 96,
+              cacheWidth: cacheSize,
+              cacheHeight: cacheSize,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(
                 width: 96,

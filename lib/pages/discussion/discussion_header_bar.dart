@@ -7,9 +7,11 @@ import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
+import 'package:inter_knot/helpers/share_helper.dart';
 import 'package:inter_knot/helpers/time_formatter.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/pages/profile_page.dart';
+import 'package:inter_knot/components/report_sheet.dart';
 
 class DiscussionHeaderBar extends StatelessWidget {
   const DiscussionHeaderBar({
@@ -145,6 +147,28 @@ class DiscussionHeaderBar extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ClickRegion(
+            child: const Icon(
+              Icons.share,
+              color: Color(0xffB0B0B0),
+              size: 22,
+            ),
+            onTap: () => ShareHelper.sharePost(discussion.id),
+          ),
+          const SizedBox(width: 8),
+          ClickRegion(
+            child: const Icon(
+              Icons.outlined_flag,
+              color: Color(0xffB0B0B0),
+              size: 22,
+            ),
+            onTap: () => showReportSheet(
+              context,
+              targetType: 'article',
+              targetId: discussion.id,
             ),
           ),
           const SizedBox(width: 8),

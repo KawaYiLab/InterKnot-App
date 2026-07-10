@@ -6,7 +6,7 @@ extension SystemApi on Api {
     if (res.hasError) {
       debugPrint('Renew Error: ${res.statusCode} - ${res.bodyString}');
       throw ApiException(
-        res.statusText ?? 'Request failed',
+        _errorMessageFromBody(res.body) ?? '登录态刷新失败',
         statusCode: res.statusCode,
       );
     }
@@ -28,13 +28,16 @@ extension SystemApi on Api {
     final res = await get('/api/me/exp');
 
     if (res.hasError) {
-      throw ApiException(res.statusText ?? 'Failed to fetch exp',
-          statusCode: res.statusCode, details: res.bodyString);
+      throw ApiException(
+        _errorMessageFromBody(res.body) ?? '获取经验失败',
+        statusCode: res.statusCode,
+        details: res.bodyString,
+      );
     }
 
     final body = res.body;
     if (body is! Map) {
-      throw ApiException('Invalid exp response');
+      throw ApiException('经验数据格式异常');
     }
 
     return (
@@ -69,7 +72,7 @@ extension SystemApi on Api {
     }
     final body = res.body;
     if (body is! Map) {
-      throw ApiException('Invalid check-in status response');
+      throw ApiException('签到数据格式异常');
     }
 
     return (
@@ -103,24 +106,11 @@ extension SystemApi on Api {
     final res = await post('/api/check-in', <String, dynamic>{});
 
     if (res.hasError) {
-      String errorMessage = '签到失败';
-      dynamic details;
-      if (res.body is Map) {
-        final error = res.body['error'];
-        if (error is Map) {
-          final code = error['code']?.toString();
-          details = error['details'] ?? res.body;
-
-          if (code == 'CHECK_IN_ALREADY_TODAY') {
-            errorMessage = '今日已签到';
-          } else if (error['message'] == 'Already checked in today.') {
-            // Backward compatibility for old backend message.
-            errorMessage = '今日已签到';
-          }
-        }
-      }
+      final bodyMap = res.body is Map ? res.body as Map : null;
+      final errorMap = bodyMap?['error'] is Map ? bodyMap!['error'] as Map : null;
+      final details = errorMap?['details'] ?? bodyMap;
       throw ApiException(
-        errorMessage,
+        _errorMessageFromBody(res.body) ?? '签到失败',
         statusCode: res.statusCode,
         details: details,
       );
