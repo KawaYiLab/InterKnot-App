@@ -124,7 +124,7 @@ extension ReportApi on Api {
         return ReportCreated.fromJson(data);
       }
     }
-    throw ApiException('Invalid report response');
+    throw ApiException('举报返回数据格式异常');
   }
 
   /// GET /api/reports/check
@@ -151,7 +151,7 @@ extension ReportApi on Api {
         return data.map((k, v) => MapEntry(k.toString(), v == true));
       }
     }
-    throw ApiException('Invalid report check response');
+    throw ApiException('举报状态数据格式异常');
   }
 
   /// GET /api/reports/my-list
@@ -173,6 +173,6 @@ extension ReportApi on Api {
     if (body is Map<String, dynamic>) {
       return ReportListResult.fromJson(body);
     }
-    throw ApiException('Invalid report list response');
+    throw ApiException('举报列表数据格式异常');
   }
 }

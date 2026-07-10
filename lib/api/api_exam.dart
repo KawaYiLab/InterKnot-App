@@ -229,7 +229,7 @@ extension ExamApi on Api {
     if (body is Map<String, dynamic>) {
       return ExamStatus.fromJson(body);
     }
-    throw ApiException('Invalid exam status response');
+    throw ApiException('考试状态数据格式异常');
   }
 
   /// POST /api/exam/start
@@ -246,7 +246,7 @@ extension ExamApi on Api {
     if (body is Map<String, dynamic>) {
       return ExamStartResult.fromJson(body);
     }
-    throw ApiException('Invalid start exam response');
+    throw ApiException('开始考试数据格式异常');
   }
 
   /// POST /api/exam/submit
@@ -272,6 +272,6 @@ extension ExamApi on Api {
     if (body is Map<String, dynamic>) {
       return ExamSubmitResult.fromJson(body);
     }
-    throw ApiException('Invalid submit exam response');
+    throw ApiException('提交答卷数据格式异常');
   }
 }

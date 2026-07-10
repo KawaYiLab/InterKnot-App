@@ -15,12 +15,12 @@ extension UploadApi on Api {
     );
 
     if (result == null) {
-      throw ApiException('Upload failed');
+      throw ApiException('上传失败');
     }
 
     final rawAvatarId = result['id'];
     if (rawAvatarId == null) {
-      throw ApiException('Upload response missing file id');
+      throw ApiException('上传响应缺少文件ID');
     }
     final uploadedUrl = _normalizeFileUrl(result['url'] as String?);
 
@@ -34,7 +34,7 @@ extension UploadApi on Api {
       throw ApiException(
         _errorMessageFromBody(updateRes.body) ??
             updateRes.statusText ??
-            'Failed to bind avatar',
+            '头像绑定失败',
         statusCode: updateRes.statusCode,
       );
     }

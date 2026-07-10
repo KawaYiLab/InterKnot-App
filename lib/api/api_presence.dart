@@ -39,7 +39,7 @@ extension PresenceApi on Api {
     if (bodyMap is Map<String, dynamic>) {
       return PresenceInfo.fromJson(bodyMap);
     }
-    throw ApiException('Invalid presence response');
+    throw ApiException('在线心跳数据格式异常');
   }
 
   /// GET /api/presence/online
@@ -55,6 +55,6 @@ extension PresenceApi on Api {
     if (body is Map<String, dynamic>) {
       return PresenceInfo.fromJson(body);
     }
-    throw ApiException('Invalid online status response');
+    throw ApiException('在线状态数据格式异常');
   }
 }

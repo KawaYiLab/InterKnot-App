@@ -25,11 +25,11 @@ extension DmApi on Api {
     );
     final body = res.body;
     if (body is! Map<String, dynamic>) {
-      throw ApiException('invalid direct response');
+      throw ApiException('私信对话数据格式异常');
     }
     final data = body['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('invalid direct response');
+      throw ApiException('私信对话数据格式异常');
     }
     return (
       summary: DmConversationSummary.fromJson(data),
@@ -84,11 +84,11 @@ extension DmApi on Api {
     );
     final body = res.body;
     if (body is! Map<String, dynamic>) {
-      throw ApiException('invalid send response');
+      throw ApiException('私信发送失败');
     }
     final data = body['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('invalid send response');
+      throw ApiException('私信发送失败');
     }
     return DmMessage.fromJson(data);
   }
@@ -157,11 +157,11 @@ extension DmApi on Api {
     final res = await postWithRetry('/api/dm/socket/ticket', {});
     final body = res.body;
     if (body is! Map<String, dynamic>) {
-      throw ApiException('invalid ticket response');
+      throw ApiException('会话票据数据格式异常');
     }
     final data = body['data'];
     if (data is! Map<String, dynamic>) {
-      throw ApiException('invalid ticket response');
+      throw ApiException('会话票据数据格式异常');
     }
     return (
       ticket: data['ticket'] as String? ?? '',

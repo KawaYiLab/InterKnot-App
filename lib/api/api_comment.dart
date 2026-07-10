@@ -101,7 +101,7 @@ extension CommentApi on Api {
     List<String>? imageIds,
   }) {
     if (discussionId.isEmpty) {
-      throw ApiException('Discussion ID cannot be empty');
+      throw ApiException('帖子ID不能为空');
     }
 
     debugPrint(

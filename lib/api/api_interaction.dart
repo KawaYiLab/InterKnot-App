@@ -66,7 +66,7 @@ extension InteractionApi on Api {
         favoritesCount: (body['favoritesCount'] as num?)?.toInt() ?? 0,
       );
     }
-    throw ApiException('Invalid toggle favorite response');
+    throw ApiException('收藏返回数据格式异常');
   }
 
   Future<Map<String, bool>> batchCheckFavorites(
@@ -139,7 +139,7 @@ extension InteractionApi on Api {
         newBalance: body['newBalance'] is int ? body['newBalance'] as int : null,
       );
     }
-    throw ApiException('Invalid triple action response');
+    throw ApiException('三连返回数据格式异常');
   }
 
 
@@ -207,7 +207,7 @@ extension InteractionApi on Api {
     if (res.hasError) {
       debugPrint('ToggleLike Error: ${res.statusCode} - ${res.bodyString}');
       final body = res.body;
-      String msg = 'Toggle like failed';
+      String msg = '点赞失败';
       if (body is Map) {
         final error = body['error'];
         if (error is Map && error['message'] != null) {
@@ -224,7 +224,7 @@ extension InteractionApi on Api {
         likesCount: (body['likesCount'] as num?)?.toInt() ?? 0,
       );
     }
-    throw ApiException('Invalid toggle like response');
+    throw ApiException('点赞返回数据格式异常');
   }
 
   Future<Map<String, bool>> batchCheckLikes({

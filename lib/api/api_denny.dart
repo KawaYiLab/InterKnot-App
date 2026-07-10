@@ -84,7 +84,7 @@ extension DennyApi on Api {
     if (body is Map<String, dynamic>) {
       return DennyBalance.fromJson(body);
     }
-    throw ApiException('Invalid denny balance response');
+    throw ApiException('丁尼余额数据格式异常');
   }
 
   /// POST /api/user-denny/give
@@ -107,6 +107,6 @@ extension DennyApi on Api {
     if (body is Map<String, dynamic>) {
       return DennyGiveResult.fromJson(body);
     }
-    throw ApiException('Invalid give denny response');
+    throw ApiException('投币返回数据格式异常');
   }
 }

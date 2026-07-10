@@ -86,7 +86,7 @@ extension FollowApi on Api {
     if (body is Map<String, dynamic>) {
       return FollowToggleResult.fromJson(body);
     }
-    throw ApiException('Invalid follow toggle response');
+    throw ApiException('关注返回数据格式异常');
   }
 
   /// GET /api/follows/check
@@ -107,7 +107,7 @@ extension FollowApi on Api {
     if (body is Map<String, dynamic>) {
       return FollowCheckResult.fromJson(body).data;
     }
-    throw ApiException('Invalid follow check response');
+    throw ApiException('关注状态数据格式异常');
   }
 
   /// GET /api/follows/following
@@ -130,6 +130,6 @@ extension FollowApi on Api {
     if (body is Map<String, dynamic>) {
       return FollowListResult.fromJson(body);
     }
-    throw ApiException('Invalid following list response');
+    throw ApiException('关注列表数据格式异常');
   }
 }

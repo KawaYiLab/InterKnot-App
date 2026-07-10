@@ -129,7 +129,7 @@ extension MeApi on Api {
     }
     final body = res.body;
     if (body is Map<String, dynamic>) return body;
-    throw ApiException('Invalid profile response');
+    throw ApiException('个人资料数据格式异常');
   }
 
   /// PUT /api/me/profile/name
@@ -146,7 +146,7 @@ extension MeApi on Api {
     if (body is Map && body['success'] == true) {
       return body['name']?.toString() ?? name;
     }
-    throw ApiException('Invalid update name response');
+    throw ApiException('改名返回数据格式异常');
   }
 
   /// PUT /api/me/profile/bio
@@ -191,7 +191,7 @@ extension MeApi on Api {
     if (body is Map<String, dynamic>) {
       return PinnedArticlesResult.fromJson(body);
     }
-    throw ApiException('Invalid pinned articles response');
+    throw ApiException('置顶文章数据格式异常');
   }
 
   /// PUT /api/me/profile/pinned-articles
@@ -229,7 +229,7 @@ extension MeApi on Api {
     if (body is Map<String, dynamic>) {
       return AvatarListResult.fromJson(body);
     }
-    throw ApiException('Invalid avatars response');
+    throw ApiException('头像列表数据格式异常');
   }
 
   /// PUT /api/me/avatars/equip
@@ -265,7 +265,7 @@ extension MeApi on Api {
     if (body is Map<String, dynamic>) {
       return BusinessCardListResult.fromJson(body);
     }
-    throw ApiException('Invalid business cards response');
+    throw ApiException('名片列表数据格式异常');
   }
 
   /// PUT /api/me/business-cards/equip
@@ -308,7 +308,7 @@ extension MeApi on Api {
         return data.whereType<Map<String, dynamic>>().toList();
       }
     }
-    throw ApiException('Invalid uploads response');
+    throw ApiException('上传返回数据格式异常');
   }
 }
 
