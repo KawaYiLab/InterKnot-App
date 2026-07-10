@@ -113,7 +113,7 @@ class UpdateService {
           int.tryParse(jsonData['versionCode']?.toString() ?? '') ?? 0;
       final downloadUrl = jsonData['downloadUrl']?.toString() ?? '';
       final updateLog = jsonData['updateLog']?.toString() ?? '';
-      final forceUpdate = jsonData['forceUpdate'] as bool? ?? false;
+      final forceUpdate = jsonData['forceUpdate'] == true;
       final fileSize = jsonData['fileSize']?.toString() ?? '';
 
       if (latestVersion.isEmpty || downloadUrl.isEmpty) {
