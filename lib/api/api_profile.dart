@@ -19,6 +19,12 @@ extension ProfileApi on Api {
       if (id != null && id.isNotEmpty) {
         user.authorId = id;
       }
+      final avatarUrl = author is Map
+          ? AuthorModel.extractAvatarUrl(author['avatar'])
+          : null;
+      if (avatarUrl != null && avatarUrl.isNotEmpty) {
+        user.avatar = avatarUrl;
+      }
     } catch (_) {
       // author 关联获取失败时保持为空，后续 ensureAuthorForUser 会重试。
     }

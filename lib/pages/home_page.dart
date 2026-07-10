@@ -14,7 +14,9 @@ import 'package:inter_knot/pages/my_discussions_page.dart';
 import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/components/update_dialog.dart';
 import 'package:inter_knot/services/update_service.dart';
+import 'package:inter_knot/utils/level_utils.dart';
 
+import 'package:inter_knot/pages/level_page.dart';
 import 'package:inter_knot/pages/my_page_desktop.dart';
 
 class HomePage extends StatefulWidget {
@@ -687,44 +689,11 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildMobileLevelAndCheckInSection(
       BuildContext context, dynamic user) {
-    const levelTable = [
-      (level: 6, exp: 3200, title: '传奇绳匠'),
-      (level: 5, exp: 1600, title: '精英绳匠'),
-      (level: 4, exp: 800, title: '资深绳匠'),
-      (level: 3, exp: 400, title: '正式绳匠'),
-      (level: 2, exp: 200, title: '见习绳匠'),
-      (level: 1, exp: 0, title: '新手绳匠'),
-    ];
-
-    final currentLevel = user.level ?? 1;
+    final currentLevel = user.level ?? LevelUtils.currentLevel(user.exp ?? 0);
     final currentExp = user.exp ?? 0;
-
-    final currentConfig = levelTable.firstWhere(
-      (e) => e.level == currentLevel,
-      orElse: () => levelTable.last,
-    );
-
-    final nextConfig =
-        levelTable.cast<({int level, int exp, String title})?>().firstWhere(
-              (e) => e != null && e.level == currentLevel + 1,
-              orElse: () => null,
-            );
-
-    double progress = 0.0;
-    int nextExpTarget = currentExp;
-
-    if (nextConfig != null) {
-      final levelExp = currentConfig.exp;
-      final nextExp = nextConfig.exp;
-      nextExpTarget = nextExp;
-      if (nextExp > levelExp) {
-        progress = (currentExp - levelExp) / (nextExp - levelExp);
-      }
-      progress = progress.clamp(0.0, 1.0);
-    } else {
-      progress = 1.0;
-      nextExpTarget = currentExp;
-    }
+    final currentTitle = LevelUtils.titleFor(currentLevel);
+    final nextExpTarget = LevelUtils.nextLevelExp(currentExp);
+    final progress = LevelUtils.progress(currentExp);
 
     final cannotCheckInNow = !user.canCheckIn;
 
@@ -737,9 +706,12 @@ class _HomePageState extends State<HomePage>
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: GestureDetector(
+          onTap: () => LevelPage.open(context),
+          behavior: HitTestBehavior.translucent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Header
             Row(
               children: [
@@ -810,7 +782,7 @@ class _HomePageState extends State<HomePage>
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      currentConfig.title,
+                      currentTitle,
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -819,13 +791,27 @@ class _HomePageState extends State<HomePage>
                     ),
                   ],
                 ),
-                Text(
-                  '$currentExp / $nextExpTarget XP',
-                  style: const TextStyle(
-                    color: Color(0xff606060),
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$currentExp / $nextExpTarget XP',
+                      style: const TextStyle(
+                        color: Color(0xff606060),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '丁尼 ${user.denny ?? 0}',
+                      style: const TextStyle(
+                        color: Color(0xff606060),
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -966,6 +952,7 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
+      ),
       ),
     );
   }
