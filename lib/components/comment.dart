@@ -807,7 +807,7 @@ class _CommentState extends State<Comment> {
 
   Widget _buildImageGrid(BuildContext context, List<String> images) {
     final dpr = MediaQuery.devicePixelRatioOf(context);
-    final cacheSize = (96 * dpr).ceil();
+    final cacheSize = (96 * dpr).ceil().clamp(1, 9999);
     return Wrap(
       spacing: 8,
       runSpacing: 8,

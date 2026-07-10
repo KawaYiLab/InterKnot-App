@@ -17,7 +17,7 @@ class Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasSrc = src != null && src!.trim().isNotEmpty;
-    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).ceil();
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).ceil().clamp(1, 9999);
     final avatar = ClipOval(
       child: !hasSrc
           ? Assets.images.profilePhoto.image(

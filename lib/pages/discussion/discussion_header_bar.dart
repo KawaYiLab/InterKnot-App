@@ -165,11 +165,15 @@ class DiscussionHeaderBar extends StatelessWidget {
               color: Color(0xffB0B0B0),
               size: 22,
             ),
-            onTap: () => showReportSheet(
-              context,
-              targetType: 'article',
-              targetId: discussion.id,
-            ),
+            onTap: () async {
+              if (!await c.ensureLogin()) return;
+              if (!context.mounted) return;
+              showReportSheet(
+                context,
+                targetType: 'article',
+                targetId: discussion.id,
+              );
+            },
           ),
           const SizedBox(width: 8),
           ClickRegion(

@@ -390,8 +390,8 @@ class Cover extends StatelessWidget {
       builder: (context, constraints) {
         final dpr = MediaQuery.devicePixelRatioOf(context);
         final maxWidth = constraints.maxWidth;
-        final memCacheWidth = (maxWidth * dpr).ceil();
-        final memCacheHeight = (memCacheWidth / clampedAspectRatio).ceil();
+        final memCacheWidth = (maxWidth * dpr).ceil().clamp(1, 9999);
+        final memCacheHeight = (memCacheWidth / clampedAspectRatio).ceil().clamp(1, 9999);
 
         Widget image;
         if (highResUrl == null) {
