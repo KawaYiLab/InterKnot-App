@@ -130,6 +130,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         user.bio = newBio;
       }
       c.user.refresh();
+      await c.refreshMyExp();
       if (mounted) Navigator.of(context).pop();
       showToast('资料已保存');
     } catch (e) {
