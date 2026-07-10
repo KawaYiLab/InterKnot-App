@@ -18,13 +18,18 @@ class KnockSseService {
 
   /// 启动 SSE（若已存在则先关闭）
   void start() {
-    stop();
+    _disconnect();
     _active = true;
     _connect();
   }
 
   void stop() {
     _active = false;
+    _disconnect();
+  }
+
+  /// 关闭当前连接但不重置 _active 状态，便于重连逻辑复用
+  void _disconnect() {
     _subscription?.cancel();
     _subscription = null;
     _client?.close();
@@ -105,7 +110,7 @@ class KnockSseService {
   }
 
   void _scheduleReconnect() {
-    stop();
+    _disconnect();
     if (!_active) return;
     Future.delayed(const Duration(seconds: 5), () {
       if (_active) start();

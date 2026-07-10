@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/components/notification_card.dart';
 import 'package:inter_knot/controllers/messaging_controller.dart';
+import 'package:inter_knot/helpers/dialog_helper.dart';
+import 'package:inter_knot/helpers/toast.dart';
+import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/models/notification.dart';
+import 'package:inter_knot/pages/discussion_page.dart';
 
 class KnockChatPage extends StatefulWidget {
   const KnockChatPage({super.key});
@@ -54,10 +59,37 @@ class _KnockChatPageState extends State<KnockChatPage> {
   }
 
   void _markSingleRead(NotificationModel msg) {
-    // 敲敲会话页走批量已读，不再单独标记
+    // 会话级已读：先调用 mark-read 再刷新当前会话消息
+    controller.markCurrentKnockAsRead();
   }
 
-  void _openNotification(BuildContext context, NotificationModel msg) {
-    // 可跳转文章详情；阶段 2 先保留空实现
+  Future<void> _openNotification(BuildContext context, NotificationModel msg) async {
+    final documentId = msg.articleDocumentId ?? '';
+    if (documentId.isEmpty) {
+      _markSingleRead(msg);
+      return;
+    }
+    try {
+      final discussion = await Get.find<Api>().getArticleDetail(documentId);
+      HDataModel.upsertCachedDiscussion(discussion);
+      final hData = HDataModel(
+        id: discussion.id,
+        updatedAt: discussion.lastEditedAt ?? discussion.createdAt,
+        createdAt: discussion.createdAt,
+        isPinned: false,
+      );
+      if (!context.mounted) return;
+      await showZZZDialog(
+        context: context,
+        pageBuilder: (context) => DiscussionPage(
+          discussion: discussion,
+          hData: hData,
+        ),
+      );
+      _markSingleRead(msg);
+    } catch (e) {
+      debugPrint('Load article error: $e');
+      showToast('加载文章失败', isError: true);
+    }
   }
 }

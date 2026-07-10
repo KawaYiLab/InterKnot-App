@@ -82,7 +82,7 @@ class MessagingController extends GetxController {
 
   void start() {
     _knockSse.start();
-    _dmWs.connect();
+    _dmWs.start();
     refreshDmConversations();
     refreshKnockConversations();
     refreshAiCharacters();
@@ -201,7 +201,9 @@ class MessagingController extends GetxController {
     final before = append ? currentDmNextCursor.value : null;
     try {
       final result = await api.getDmMessages(id, before: (before?.isEmpty ?? true) ? null : before);
-      final items = result.items;
+      // 后端返回 createdAt desc，展示时需要按时间升序排列
+      final items = result.items.toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       if (append) {
         currentDmMessages.insertAll(0, items);
       } else {
@@ -252,8 +254,12 @@ class MessagingController extends GetxController {
         content: text.trim(),
         replyTo: replyTo,
       );
-      currentDmMessages.add(msg);
-      aiStreaming.value = true;
+      // 防止 WS 推送先到达导致重复
+      if (!currentDmMessages.any((m) => m.documentId == msg.documentId)) {
+        currentDmMessages.add(msg);
+      }
+      // 只有对 AI 角色发消息时才显示「AI 正在输入」
+      aiStreaming.value = currentDmConversation.value?.peer?.isAiAgent == true;
       return msg;
     } catch (e) {
       debugPrint('sendDmText error: $e');
@@ -276,6 +282,11 @@ class MessagingController extends GetxController {
           deletedAt: old.deletedAt,
           sender: old.sender,
           replyTo: old.replyTo,
+          notificationKind: old.notificationKind,
+          notificationDocumentId: old.notificationDocumentId,
+          notificationRead: old.notificationRead,
+          article: old.article,
+          comment: old.comment,
         );
       }
     } catch (e) {
@@ -298,6 +309,11 @@ class MessagingController extends GetxController {
           deletedAt: DateTime.now(),
           sender: old.sender,
           replyTo: old.replyTo,
+          notificationKind: old.notificationKind,
+          notificationDocumentId: old.notificationDocumentId,
+          notificationRead: old.notificationRead,
+          article: old.article,
+          comment: old.comment,
         );
       }
     } catch (e) {
@@ -343,10 +359,17 @@ class MessagingController extends GetxController {
     currentKnockMessages.clear();
     currentKnockHasMore.value = false;
     currentKnockNextCursor.value = '';
-    await loadKnockMessages();
+    await markCurrentKnockAsRead();
+  }
+
+  /// 标记当前敲敲会话已读并重新加载消息（先调用 mark-read，再拉取消息，使返回的 isRead 已更新）
+  Future<void> markCurrentKnockAsRead() async {
+    final id = currentKnockId.value;
+    if (id.isEmpty) return;
+
     try {
-      await api.markKnockConversationAsRead(conversationId);
-      final idx = knockConversations.indexWhere((c) => c.id == conversationId);
+      await api.markKnockConversationAsRead(id);
+      final idx = knockConversations.indexWhere((c) => c.id == id);
       if (idx >= 0) {
         final old = knockConversations[idx];
         knockConversations[idx] = KnockConversation(
@@ -366,6 +389,8 @@ class MessagingController extends GetxController {
     } catch (e) {
       debugPrint('markKnockAsRead error: $e');
     }
+
+    await loadKnockMessages();
   }
 
   Future<void> loadKnockMessages({bool append = false}) async {
@@ -374,10 +399,13 @@ class MessagingController extends GetxController {
     final cursor = append ? currentKnockNextCursor.value : null;
     try {
       final result = await api.getKnockMessages(id, cursor: cursor);
+      // 后端 /knock/messages 已返回 createdAt asc；追加历史时应插到列表头部
+      final items = result.items.toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
       if (append) {
-        currentKnockMessages.addAll(result.items);
+        currentKnockMessages.insertAll(0, items);
       } else {
-        currentKnockMessages.assignAll(result.items);
+        currentKnockMessages.assignAll(items);
       }
       currentKnockHasMore.value = result.hasMore;
       currentKnockNextCursor.value = result.nextCursor ?? '';
@@ -419,6 +447,11 @@ class MessagingController extends GetxController {
             deletedAt: old.deletedAt,
             sender: old.sender,
             replyTo: old.replyTo,
+            notificationKind: old.notificationKind,
+            notificationDocumentId: old.notificationDocumentId,
+            notificationRead: old.notificationRead,
+            article: old.article,
+            comment: old.comment,
           );
         }
         break;
@@ -437,6 +470,11 @@ class MessagingController extends GetxController {
             deletedAt: DateTime.now(),
             sender: old.sender,
             replyTo: old.replyTo,
+            notificationKind: old.notificationKind,
+            notificationDocumentId: old.notificationDocumentId,
+            notificationRead: old.notificationRead,
+            article: old.article,
+            comment: old.comment,
           );
         }
         break;

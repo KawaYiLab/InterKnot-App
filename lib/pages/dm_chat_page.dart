@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/controllers/messaging_controller.dart';
+import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/time_formatter.dart';
+import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/dm_message.dart';
+import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/pages/discussion_page.dart';
 
 class DmChatPage extends StatefulWidget {
   const DmChatPage({super.key});
@@ -17,9 +23,27 @@ class _DmChatPageState extends State<DmChatPage> {
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  Worker? _scrollWorker;
+  bool _isAtBottom = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.hasClients) {
+        _isAtBottom = _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 48;
+      }
+    });
+    _scrollWorker = ever(controller.currentDmMessages, (_) {
+      _scrollToBottom();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
+  }
 
   @override
   void dispose() {
+    _scrollWorker?.dispose();
     _inputController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -31,18 +55,18 @@ class _DmChatPageState extends State<DmChatPage> {
     if (text.isEmpty) return;
     _inputController.clear();
     controller.sendDmText(text);
-    _scrollToBottom();
+    _scrollToBottom(force: true);
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
+      if (!_scrollController.hasClients) return;
+      if (!force && !_isAtBottom) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -96,8 +120,6 @@ class _DmChatPageState extends State<DmChatPage> {
                 itemCount: messages.length,
                 itemBuilder: (context, index) => _DmMessageBubble(
                   message: messages[index],
-                  isFirst: index == 0,
-                  isLast: index == messages.length - 1,
                 ),
               );
             }),
@@ -158,14 +180,8 @@ class _DmChatPageState extends State<DmChatPage> {
 
 class _DmMessageBubble extends StatelessWidget {
   final DmMessage message;
-  final bool isFirst;
-  final bool isLast;
 
-  const _DmMessageBubble({
-    required this.message,
-    required this.isFirst,
-    required this.isLast,
-  });
+  const _DmMessageBubble({required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -219,10 +235,7 @@ class _DmMessageBubble extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              Text(
-                message.content ?? '',
-                style: TextStyle(color: isSelf ? Colors.black : Colors.white),
-              ),
+              _buildContent(isSelf),
               const SizedBox(height: 4),
               Text(
                 formatRelativeTime(message.createdAt),
@@ -237,6 +250,47 @@ class _DmMessageBubble extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildContent(bool isSelf) {
+    if (message.isDeleted) {
+      return Text(
+        message.kind == DmMessageKind.image ? '[图片已撤回]' : '[消息已撤回]',
+        style: TextStyle(
+          color: isSelf ? Colors.black.withValues(alpha: 0.5) : Colors.grey,
+          fontSize: 12,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+
+    if (message.kind == DmMessageKind.image) {
+      final url = _normalizeImageUrl(message.content);
+      if (url != null && url.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            url,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+          ),
+        );
+      }
+      return const Icon(Icons.image, color: Colors.grey);
+    }
+
+    return Text(
+      message.content ?? '',
+      style: TextStyle(color: isSelf ? Colors.black : Colors.white),
+    );
+  }
+
+  String? _normalizeImageUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    if (url.startsWith('/')) return '$base$url';
+    return '$base/$url';
+  }
 }
 
 class _NotificationMessage extends StatelessWidget {
@@ -246,51 +300,95 @@ class _NotificationMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xff1F1F1F),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _notificationTitle(message),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (message.content?.isNotEmpty == true) ...[
-              const SizedBox(height: 4),
+    return GestureDetector(
+      onTap: () => _openArticle(context),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xff1F1F1F),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                message.content!,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                _notificationTitle(message),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              if (message.content?.isNotEmpty == true) ...[
+                const SizedBox(height: 4),
+                Text(
+                  message.content!,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                ),
+              ],
+              if (message.article?.title.isNotEmpty == true) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '《${message.article!.title}》',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
+  Future<void> _openArticle(BuildContext context) async {
+    final documentId = message.article?.documentId;
+    if (documentId == null || documentId.isEmpty) return;
+    try {
+      final discussion = await Get.find<Api>().getArticleDetail(documentId);
+      HDataModel.upsertCachedDiscussion(discussion);
+      final hData = HDataModel(
+        id: discussion.id,
+        updatedAt: discussion.lastEditedAt ?? discussion.createdAt,
+        createdAt: discussion.createdAt,
+        isPinned: false,
+      );
+      if (!context.mounted) return;
+      await showZZZDialog(
+        context: context,
+        pageBuilder: (context) => DiscussionPage(
+          discussion: discussion,
+          hData: hData,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Load article error: $e');
+      showToast('加载文章失败', isError: true);
+    }
+  }
+
   String _notificationTitle(DmMessage msg) {
+    final senderName = msg.sender?.name ?? '';
+    final prefix = senderName.isNotEmpty ? '${senderName}' : '';
     switch (msg.notificationKind) {
       case DmNotificationKind.like:
-        return '赞了你的帖子';
+        return '${prefix}赞了你的帖子';
       case DmNotificationKind.favorite:
-        return '收藏了你的帖子';
+        return '${prefix}收藏了你的帖子';
       case DmNotificationKind.comment:
-        return '评论了你的帖子';
+        return '${prefix}评论了你的帖子';
       case DmNotificationKind.reply:
-        return '回复了你的评论';
+        return '${prefix}回复了你的评论';
       case DmNotificationKind.mention:
-        return '提到了你';
+        return '${prefix}提到了你';
       case DmNotificationKind.system:
         return '系统通知';
       default:

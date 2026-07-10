@@ -20,6 +20,7 @@ class DmWebSocketService {
   Timer? _pingTimer;
   Timer? _reconnectTimer;
   bool _stopping = false;
+  bool _connecting = false;
 
   int _attempts = 0;
   static const _maxAttempts = 6;
@@ -28,42 +29,54 @@ class DmWebSocketService {
   final _eventController = StreamController<DmEvent>.broadcast();
   Stream<DmEvent> get eventStream => _eventController.stream;
 
-  Future<void> connect() async {
-    if (_stopping) return;
-    if (_channel != null) return;
+  /// 启动 WebSocket：重置停止标志与重试计数，然后尝试连接。
+  void start() {
+    _stopping = false;
+    _attempts = 0;
+    connect();
+  }
 
-    final token = box.read<String>('access_token');
-    if (token == null || token.isEmpty) {
-      scheduleReconnect();
-      return;
-    }
+  Future<void> connect() async {
+    if (_stopping || _connecting) return;
+    if (_channel != null) return;
+    _connecting = true;
 
     try {
-      final ticketRes = await api.getDmSocketTicket();
-      final url = _buildWsUrl(api, ticketRes.ticket);
+      final token = box.read<String>('access_token');
+      if (token == null || token.isEmpty) {
+        scheduleReconnect();
+        return;
+      }
 
-      _channel = IOWebSocketChannel.connect(
-        Uri.parse(url),
-        pingInterval: const Duration(seconds: 20),
-      );
+      try {
+        final ticketRes = await api.getDmSocketTicket();
+        final url = _buildWsUrl(api, ticketRes.ticket);
 
-      _channel!.stream.listen(
-        _onMessage,
-        onError: (Object e) {
-          _disposeChannel();
-          scheduleReconnect();
-        },
-        onDone: () {
-          _disposeChannel();
-          scheduleReconnect();
-        },
-      );
+        _channel = IOWebSocketChannel.connect(
+          Uri.parse(url),
+          pingInterval: const Duration(seconds: 20),
+        );
 
-      _startPingTimer();
-      _attempts = 0;
-    } catch (e) {
-      _disposeChannel();
-      scheduleReconnect();
+        _channel!.stream.listen(
+          _onMessage,
+          onError: (Object e) {
+            _disposeChannel();
+            scheduleReconnect();
+          },
+          onDone: () {
+            _disposeChannel();
+            scheduleReconnect();
+          },
+        );
+
+        _startPingTimer();
+        _attempts = 0;
+      } catch (e) {
+        _disposeChannel();
+        scheduleReconnect();
+      }
+    } finally {
+      _connecting = false;
     }
   }
 
