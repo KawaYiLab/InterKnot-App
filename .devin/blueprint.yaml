@@ -1,0 +1,33 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+initialize: |
+  # Ensure Flutter SDK is on PATH and Linux desktop artifacts are cached
+  if ! command -v flutter &> /dev/null; then
+    if [ -d /home/ubuntu/sdk/flutter ]; then
+      export PATH=/home/ubuntu/sdk/flutter/bin:$PATH
+    else
+      git clone https://github.com/flutter/flutter.git -b 3.27.4 --depth 1 /home/ubuntu/sdk/flutter
+      export PATH=/home/ubuntu/sdk/flutter/bin:$PATH
+    fi
+  fi
+  echo "PATH=/home/ubuntu/sdk/flutter/bin:$PATH" >> $ENVRC
+  flutter config --enable-linux-desktop
+  flutter precache --linux
+  # Linux desktop build dependencies
+  sudo apt-get update
+  sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libblkid-dev
+maintenance: |
+  export PATH=/home/ubuntu/sdk/flutter/bin:$PATH
+  flutter pub get
+knowledge:
+  - name: lint
+    contents: |
+      flutter analyze
+  - name: build
+    contents: |
+      flutter build linux
+  - name: test
+    contents: |
+      flutter test
+  - name: notes
+    contents: |
+      Flutter SDK expected at /home/ubuntu/sdk/flutter. Production base URL is in lib/constants/api_config.dart and lib/models/author.dart; dev backend is not committed.

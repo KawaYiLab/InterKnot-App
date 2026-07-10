@@ -5,9 +5,10 @@ import 'package:get/get.dart';
 import 'package:inter_knot/components/my_tab.dart';
 import 'package:inter_knot/components/search_field.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
-import 'package:inter_knot/pages/notification_page.dart';
+import 'package:inter_knot/pages/message_center_page.dart';
 import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/constants/globals.dart';
+import 'package:inter_knot/controllers/messaging_controller.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/components/avatar.dart';
 
@@ -19,6 +20,8 @@ class MyAppBar extends StatefulWidget {
 }
 
 class _MyAppBarState extends State<MyAppBar> {
+  final messagingController = Get.find<MessagingController>();
+
   @override
   void initState() {
     super.initState();
@@ -244,13 +247,15 @@ class _MyAppBarState extends State<MyAppBar> {
                         ),
                         onPressed: () async {
                           if (await c.ensureLogin()) {
+                            if (!context.mounted) return;
                             // 移动端：使用平滑的页面过渡动画
                             await navigateWithSlideTransition(
                               context,
-                              const NotificationPage(),
-                              routeName: '/notifications',
+                              const MessageCenterPage(),
+                              routeName: '/messages',
                             );
-                            c.refreshUnreadNotificationCount();
+                            messagingController.refreshDmConversations();
+                            messagingController.refreshKnockConversations();
                           }
                         },
                         tooltip: '消息中心',

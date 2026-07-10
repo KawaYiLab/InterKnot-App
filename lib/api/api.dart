@@ -6,13 +6,18 @@ import 'package:http/http.dart' as http;
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/helpers/box.dart';
+import 'package:inter_knot/models/ai_role_card.dart';
 import 'package:inter_knot/models/author.dart';
 import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
+import 'package:inter_knot/models/dm_conversation.dart';
+import 'package:inter_knot/models/dm_message.dart';
 import 'package:inter_knot/models/emote.dart';
 import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/models/knock_conversation.dart';
 import 'package:inter_knot/models/mention_candidate.dart';
+import 'package:inter_knot/models/notification.dart';
 import 'package:inter_knot/models/pagination.dart';
 import 'package:inter_knot/models/search_suggestion.dart';
 import 'package:inter_knot/controllers/data.dart';
@@ -29,6 +34,7 @@ part 'api_notification.dart';
 part 'api_me.dart';
 part 'api_knock.dart';
 part 'api_dm.dart';
+part 'api_agent.dart';
 part 'api_denny.dart';
 part 'api_follow.dart';
 part 'api_exam.dart';
@@ -240,6 +246,21 @@ class BaseConnect extends GetConnect {
       () => delete<T>(url,
           contentType: contentType, headers: headers, query: query),
       operationName: operationName ?? 'DELETE $url',
+    );
+  }
+
+  Future<Response<T>> patchWithRetry<T>(
+    String url,
+    dynamic body, {
+    String? contentType,
+    Map<String, String>? headers,
+    Map<String, dynamic>? query,
+    String? operationName,
+  }) async {
+    return retryRequest(
+      () => patch<T>(url, body,
+          contentType: contentType, headers: headers, query: query),
+      operationName: operationName ?? 'PATCH $url',
     );
   }
 

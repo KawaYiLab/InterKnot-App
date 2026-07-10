@@ -367,10 +367,9 @@ class _SearchFieldState extends State<SearchField> {
   Widget build(BuildContext context) {
     final isCompact = MediaQuery.of(context).size.width < 640;
 
-    return Autocomplete<SearchSuggestionModel>(
+    return RawAutocomplete<SearchSuggestionModel>(
       optionsViewBuilder: _optionView,
       displayStringForOption: _displayStringForOption,
-      optionsMaxHeight: isCompact ? 280 : 360,
       fieldViewBuilder: (
         context,
         textEditingController,
