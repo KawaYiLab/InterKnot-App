@@ -3,73 +3,15 @@ import 'package:get/get.dart';
 import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
+import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
+import 'package:inter_knot/pages/profile_settings_page.dart';
 
 void showEditProfileDialog(BuildContext context) {
-  final user = c.user.value;
-  final controller = TextEditingController(text: user?.name);
-
-  showZZZDialog(
-    context: context,
-    pageBuilder: (context) {
-      return AlertDialog(
-        backgroundColor: const Color(0xff1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(
-            color: Color.fromARGB(59, 255, 255, 255),
-            width: 3,
-          ),
-        ),
-        title: const Text('编辑资料', style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Avatar Edit
-            const _AvatarHoverWrapper(),
-            const SizedBox(height: 8),
-            const Text(
-              '点击更换头像',
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 24),
-            // Username Edit
-            TextField(
-              controller: controller,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
-                labelText: '用户名',
-                hintText: '请输入新用户名',
-                labelStyle: TextStyle(color: Colors.grey),
-                hintStyle: TextStyle(color: Colors.grey),
-                enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey),
-                ),
-                focusedBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != user?.name) {
-                c.updateUsername(newName);
-              }
-              Navigator.of(context).pop();
-            },
-            child: const Text('保存'),
-          ),
-        ],
-      );
-    },
+  navigateWithSlideTransition(
+    context,
+    const ProfileSettingsPage(),
+    routeName: '/profile/settings',
   );
 }
 

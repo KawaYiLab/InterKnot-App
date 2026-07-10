@@ -18,6 +18,7 @@ import 'package:inter_knot/models/category.dart';
 import 'package:inter_knot/models/comment.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/pages/exam_page.dart';
 import 'package:inter_knot/pages/login_page.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Standard shared_preferences or specific wrapper?
 // The file used SharedPreferencesWithCache which is new in flutter/packages?
@@ -205,6 +206,13 @@ class Controller extends GetxController {
       final next = nextEligibleAtUtc.value;
       if (next != null && !DateTime.now().toUtc().isBefore(next)) {
         nextEligibleAtUtc.value = null;
+      }
+
+      try {
+        final dennyInfo = await api.getMyDenny();
+        u.denny = dennyInfo.denny;
+      } catch (e) {
+        logger.w('Failed to refresh denny', error: e);
       }
 
       _scheduleCheckInEligibilityRefresh(nextEligibleAtUtc.value);
@@ -952,6 +960,46 @@ class Controller extends GetxController {
       );
     }
     return isLogin.value;
+  }
+
+  bool get isExamPassed {
+    final u = user.value;
+    if (u == null) return false;
+    return u.examPassed;
+  }
+
+  /// 发帖/评论前调用。未登录先提示登录；未通过考试先提示并跳转到考试页。
+  Future<bool> ensureExamPassed(BuildContext context) async {
+    if (!await ensureLogin()) return false;
+    if (user.value?.examPassed == true) return true;
+
+    final shouldGo = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xff1E1E1E),
+        title: const Text('需要通过入站考试', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '你还没有通过入站考试，暂时无法发帖或评论。是否前往考试？',
+          style: TextStyle(color: Colors.grey),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('去考试',
+                style: TextStyle(color: Color(0xffD7FF00))),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldGo == true && context.mounted) {
+      await ExamPage.open(context);
+    }
+    return user.value?.examPassed == true;
   }
 
   Future<void> pickAndUploadAvatar() async {

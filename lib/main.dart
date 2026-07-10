@@ -266,10 +266,9 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget _buildCreateButton(BuildContext context) {
     return _AnimatedCreateButton(
       onTap: () async {
-        if (await c.ensureLogin()) {
-          if (!context.mounted) return;
-          CreateDiscussionPage.show(context);
-        }
+        if (!await c.ensureExamPassed(context)) return;
+        if (!context.mounted) return;
+        CreateDiscussionPage.show(context);
       },
     );
   }

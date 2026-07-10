@@ -210,9 +210,8 @@ class _SearchPageState extends State<SearchPage>
                   label: '发布委托',
                   width: 188,
                   onTap: () async {
-                    if (await c.ensureLogin()) {
-                      CreateDiscussionPage.show(context);
-                    }
+                    if (!await c.ensureExamPassed(context)) return;
+                    CreateDiscussionPage.show(context);
                   },
                 ),
               ],

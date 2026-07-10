@@ -287,6 +287,11 @@ class InteractionController extends GetxController {
       discussion.dennyCount = result.dennyCount;
       hData.dennyCount = result.dennyCount;
 
+      if (result.newBalance != null) {
+        _controller.user.value?.denny = result.newBalance;
+        _controller.user.refresh();
+      }
+
       if (result.coinGiven || result.coinReason == 'ALREADY_GIVEN') {
         discussion.hasGivenDenny = true;
         hData.hasGivenDenny = true;

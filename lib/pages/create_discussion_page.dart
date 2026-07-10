@@ -1231,6 +1231,9 @@ class _CreateDiscussionPageState extends State<CreateDiscussionPage> {
   }
 
   Future<void> _publish({bool isMobile = false}) async {
+    if (!await c.ensureExamPassed(context)) return;
+    if (!context.mounted) return;
+
     _isDesktopEditorActive = !isMobile;
 
     final title = titleController.text.trim();

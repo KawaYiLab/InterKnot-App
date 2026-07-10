@@ -10,6 +10,7 @@ import 'package:inter_knot/helpers/profile_dialogs.dart';
 import 'package:inter_knot/helpers/throttle.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/h_data.dart';
+import 'package:inter_knot/utils/level_utils.dart';
 import 'package:intl/intl.dart';
 
 class MyPageDesktop extends StatefulWidget {
@@ -287,44 +288,11 @@ class _MyPageDesktopState extends State<MyPageDesktop>
             );
           }
 
-          const levelTable = [
-            (level: 6, exp: 3200, title: '传奇绳匠'),
-            (level: 5, exp: 1600, title: '精英绳匠'),
-            (level: 4, exp: 800, title: '资深绳匠'),
-            (level: 3, exp: 400, title: '正式绳匠'),
-            (level: 2, exp: 200, title: '见习绳匠'),
-            (level: 1, exp: 0, title: '新手绳匠'),
-          ];
-
-          final currentLevel = user.level ?? 1;
+          final currentLevel = user.level ?? LevelUtils.currentLevel(user.exp ?? 0);
           final currentExp = user.exp ?? 0;
-
-          final currentConfig = levelTable.firstWhere(
-              (e) => e.level == currentLevel,
-              orElse: () => levelTable.last);
-
-          final nextConfig = levelTable
-              .cast<({int level, int exp, String title})?>()
-              .firstWhere(
-                (e) => e != null && e.level == currentLevel + 1,
-                orElse: () => null,
-              );
-
-          double progress = 0.0;
-          int nextExpTarget = currentExp;
-
-          if (nextConfig != null) {
-            final levelExp = currentConfig.exp;
-            final nextExp = nextConfig.exp;
-            nextExpTarget = nextExp;
-            if (nextExp > levelExp) {
-              progress = (currentExp - levelExp) / (nextExp - levelExp);
-            }
-            progress = progress.clamp(0.0, 1.0);
-          } else {
-            progress = 1.0;
-            nextExpTarget = currentExp;
-          }
+          final currentTitle = LevelUtils.titleFor(currentLevel);
+          final nextExpTarget = LevelUtils.nextLevelExp(currentExp);
+          final progress = LevelUtils.progress(currentExp);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,13 +320,20 @@ class _MyPageDesktopState extends State<MyPageDesktop>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Lv.$currentLevel ${currentConfig.title}',
+                  Text('Lv.$currentLevel $currentTitle',
                       style: const TextStyle(
                           color: Color(0xffD7FF00),
                           fontWeight: FontWeight.bold,
                           fontSize: 16)),
-                  Text('$currentExp / $nextExpTarget',
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('$currentExp / $nextExpTarget',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      Text('丁尼 ${user.denny ?? 0}',
+                          style: const TextStyle(color: Color(0xffD7FF00), fontSize: 12)),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 8),

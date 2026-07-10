@@ -96,7 +96,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     bool addPrefix = false,
     String? authorDocumentId,
   }) async {
-    if (!await c.ensureLogin()) return;
+    if (!await c.ensureExamPassed(context)) return;
 
     setState(() {
       _parentId = parentId;
@@ -235,7 +235,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   }
 
   void _handleTap() async {
-    if (!await c.ensureLogin()) return;
+    if (!await c.ensureExamPassed(context)) return;
 
     if (_isWriting) {
       _submit();
