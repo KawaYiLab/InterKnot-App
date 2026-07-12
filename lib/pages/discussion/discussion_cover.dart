@@ -25,8 +25,22 @@ class _CoverState extends State<Cover> {
   final _controller = PageController();
   int _currentIndex = 0;
 
+  /// 防止单张封面 Image 的 frameBuilder 反复 post frame 并泄漏 ImageStreamListener。
+  bool _aspectRatioReported = false;
+  ImageStream? _aspectRatioImageStream;
+  ImageStreamListener? _aspectRatioImageListener;
+  double? _lastReportedAspectRatio;
+
   @override
   void dispose() {
+    if (_aspectRatioImageStream != null &&
+        _aspectRatioImageListener != null) {
+      try {
+        _aspectRatioImageStream!.removeListener(_aspectRatioImageListener!);
+      } catch (_) {
+        // ImageStreamCompleter 可能已经 dispose，安全忽略
+      }
+    }
     _controller.dispose();
     super.dispose();
   }
@@ -69,18 +83,36 @@ class _CoverState extends State<Cover> {
               errorBuilder: (context, error, stackTrace) =>
                   Assets.images.defaultCover.image(fit: BoxFit.contain),
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (frame != null && widget.onImageLoaded != null) {
+                if (frame != null &&
+                    widget.onImageLoaded != null &&
+                    !_aspectRatioReported) {
+                  _aspectRatioReported = true;
                   // 图片加载完成，获取实际尺寸
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final imageStream = NetworkImage(url).resolve(
+                    if (!mounted) return;
+                    _aspectRatioImageStream = NetworkImage(url).resolve(
                       const ImageConfiguration(),
                     );
-                    imageStream.addListener(
-                      ImageStreamListener((info, _) {
-                        final image = info.image;
-                        final aspectRatio = image.width / image.height;
-                        widget.onImageLoaded?.call(aspectRatio);
-                      }),
+                    _aspectRatioImageListener = ImageStreamListener((info, _) {
+                      if (!mounted) {
+                        info.dispose();
+                        return;
+                      }
+                      final image = info.image;
+                      final width = image.width;
+                      final height = image.height;
+                      info.dispose();
+
+                      if (width <= 0 || height <= 0) return;
+
+                      final aspectRatio = width / height;
+                      if (_lastReportedAspectRatio == aspectRatio) return;
+                      _lastReportedAspectRatio = aspectRatio;
+
+                      widget.onImageLoaded?.call(aspectRatio);
+                    });
+                    _aspectRatioImageStream?.addListener(
+                      _aspectRatioImageListener!,
                     );
                   });
                 }
