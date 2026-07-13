@@ -127,12 +127,16 @@ extension ArticleApi on Api {
 
   Future<PaginationModel<HDataModel>> search(
       String query, String endCur,
-      {String? categorySlug}) async {
+      {String? categorySlug, String feed = 'recommend'}) async {
     final start = int.tryParse(endCur.isEmpty ? '0' : endCur) ?? 0;
     // 空 / 'all' 视为不过滤（与后端 parseCategorySlug 语义一致）。
     final hasCategory = categorySlug != null &&
         categorySlug.isNotEmpty &&
         categorySlug != 'all';
+    // 关注 / 收藏 是私有 feed，需要显式携带 token。
+    final isPrivateFeed = feed.isNotEmpty && feed != 'recommend';
+    final token = isPrivateFeed ? (box.read<String>('access_token') ?? '') : '';
+    final headers = token.isNotEmpty ? {'Authorization': 'Bearer $token'} : null;
 
     if (query.isEmpty) {
       final res = await get(
@@ -141,7 +145,9 @@ extension ArticleApi on Api {
           'start': start.toString(),
           'limit': ApiConfig.defaultPageSize.toString(),
           if (hasCategory) 'category': categorySlug,
+          if (isPrivateFeed) 'feed': feed,
         },
+        headers: headers,
       );
 
       final data = unwrapData<List<dynamic>>(res);
@@ -172,7 +178,9 @@ extension ArticleApi on Api {
         'start': start.toString(),
         'limit': ApiConfig.defaultPageSize.toString(),
         if (hasCategory) 'category': categorySlug,
+        if (isPrivateFeed) 'feed': feed,
       },
+      headers: headers,
     );
 
     final data = unwrapData<List<dynamic>>(res);

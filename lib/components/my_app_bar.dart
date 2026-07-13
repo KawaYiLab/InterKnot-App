@@ -64,10 +64,21 @@ class _MyAppBarState extends State<MyAppBar> {
                     if (isCompact)
                       Obx(() {
                         final user = c.user.value;
-                        return Avatar(
-                          user?.avatar,
-                          size: 36,
-                          onTap: () => c.animateToPage(1, animate: false),
+                        if (c.isLogin.value) {
+                          return Avatar(
+                            user?.avatar,
+                            size: 38,
+                            onTap: () => c.animateToPage(1, animate: false),
+                          );
+                        }
+                        return GestureDetector(
+                          onTap: () => c.animateToPage(0, animate: false),
+                          child: Image.asset(
+                            'assets/images/zzzicon.png',
+                            width: 38,
+                            height: 38,
+                            filterQuality: FilterQuality.medium,
+                          ),
                         );
                       })
                     else
@@ -145,7 +156,8 @@ class _MyAppBarState extends State<MyAppBar> {
                                     middle: true,
                                     isSelected: c.selectedIndex.value == 2,
                                     onTap: () async {
-                                      if (await c.ensureLogin()) {
+                                      if (await c.ensureLogin(
+                                          context: context)) {
                                         c.animateToPage(2, animate: false);
                                       }
                                     },
@@ -207,9 +219,9 @@ class _MyAppBarState extends State<MyAppBar> {
                           clipBehavior: Clip.none,
                           children: [
                             const Icon(
-                              Icons.notifications_outlined,
+                              Icons.notifications,
                               color: Colors.white,
-                              size: 24,
+                              size: 26,
                             ),
                             if (c.unreadNotificationCount.value > 0)
                               Positioned(
@@ -246,7 +258,7 @@ class _MyAppBarState extends State<MyAppBar> {
                           ],
                         ),
                         onPressed: () async {
-                          if (await c.ensureLogin()) {
+                          if (await c.ensureLogin(context: context)) {
                             if (!context.mounted) return;
                             // 移动端：使用平滑的页面过渡动画
                             await navigateWithSlideTransition(
