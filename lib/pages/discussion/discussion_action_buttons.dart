@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/click_region.dart';
 import 'package:inter_knot/components/emote_picker.dart';
 import 'package:inter_knot/components/mention_search_sheet.dart';
@@ -524,25 +525,27 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: task.previewUrl != null && task.previewUrl!.isNotEmpty
-                        ? Image.network(
-                            task.previewUrl!,
+                        ? CachedImage(
+                            url: task.previewUrl!,
+                            width: 72,
+                            height: 72,
                             fit: BoxFit.cover,
-                            loadingBuilder: (_, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return const Center(
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
+                            loadingBuilder: (context, progress) =>
+                                const Center(
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
-                              );
-                            },
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.broken_image,
-                                    color: Colors.grey, size: 24),
+                              ),
+                            ),
+                            errorBuilder: (_) => const Icon(
+                              Icons.broken_image,
+                              color: Colors.grey,
+                              size: 24,
+                            ),
                           )
                         : const Center(
                             child: Icon(Icons.image, color: Colors.grey),

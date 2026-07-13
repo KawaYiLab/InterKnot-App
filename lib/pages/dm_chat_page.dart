@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/controllers/messaging_controller.dart';
@@ -268,10 +269,10 @@ class _DmMessageBubble extends StatelessWidget {
       if (url != null && url.isNotEmpty) {
         return ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            url,
+          child: CachedImage(
+            url: url,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Icon(Icons.image, color: Colors.grey),
+            errorBuilder: (_) => const Icon(Icons.image, color: Colors.grey),
           ),
         );
       }

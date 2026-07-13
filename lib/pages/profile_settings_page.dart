@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/components/avatar.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
@@ -466,6 +467,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         itemBuilder: (context, index) {
           final item = _avatars[index];
           final selected = item['documentId'] == _equippedAvatarId;
+          final avatarUrl = item['url']?.toString() ?? '';
+          final dpr = MediaQuery.devicePixelRatioOf(context);
           return GestureDetector(
             onTap: () => _equipAvatar(item['documentId']?.toString()),
             child: Column(
@@ -482,10 +485,17 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                           : const Color(0xff2A2A2A),
                       width: selected ? 3 : 1,
                     ),
-                    image: DecorationImage(
-                      image: NetworkImage(item['url'].toString()),
-                      fit: BoxFit.cover,
-                    ),
+                    image: avatarUrl.isNotEmpty
+                        ? DecorationImage(
+                            image: cachedImageProvider(
+                              avatarUrl,
+                              width: 72,
+                              height: 72,
+                              dpr: dpr,
+                            )!,
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -521,6 +531,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           final item = _cards[index];
           final selected = item['documentId'] == _equippedCardId;
           final url = item['url']?.toString();
+          final dpr = MediaQuery.devicePixelRatioOf(context);
           return GestureDetector(
             onTap: () => _equipCard(item['documentId']?.toString()),
             child: Column(
@@ -539,7 +550,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     image: url != null && url.isNotEmpty
                         ? DecorationImage(
-                            image: NetworkImage(url),
+                            image: cachedImageProvider(
+                              url,
+                              width: 100,
+                              height: 72,
+                              dpr: dpr,
+                            )!,
                             fit: BoxFit.cover,
                           )
                         : null,

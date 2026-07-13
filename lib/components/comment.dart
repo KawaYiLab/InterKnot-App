@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/rich_text/ik_content_text.dart';
 import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/image_viewer.dart';
@@ -822,14 +823,14 @@ class _CommentState extends State<Comment> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              url,
+            child: CachedImage(
+              url: url,
               width: 96,
               height: 96,
               cacheWidth: cacheSize,
               cacheHeight: cacheSize,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_) => Container(
                 width: 96,
                 height: 96,
                 color: Colors.grey[800],

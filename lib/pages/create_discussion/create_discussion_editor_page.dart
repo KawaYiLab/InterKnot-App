@@ -8,8 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
 import 'package:get/get.dart';
-import 'package:inter_knot/components/image_viewer.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/category_selector.dart';
+import 'package:inter_knot/components/image_viewer.dart';
 import 'package:inter_knot/helpers/markdown_import.dart';
 import 'package:inter_knot/helpers/upload_task.dart';
 
@@ -581,12 +582,12 @@ class _MobileImageTile extends StatelessWidget {
     if (status == UploadStatus.done && task.serverUrl != null) {
       return GestureDetector(
         onTap: () => _openImageViewer(context),
-        child: Image.network(
-          task.serverUrl!,
+        child: CachedImage(
+          url: task.serverUrl!,
           width: 90,
           height: 90,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_) => Container(
             width: 90,
             height: 90,
             color: const Color(0xff2A2A2A),
@@ -596,12 +597,12 @@ class _MobileImageTile extends StatelessWidget {
       );
     }
     if (task.localPreviewBytes != null) {
-      return Image.memory(
-        task.localPreviewBytes!,
+      return CachedImage(
+        bytes: task.localPreviewBytes!,
         width: 90,
         height: 90,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_) => Container(
           width: 90,
           height: 90,
           color: const Color(0xff2A2A2A),

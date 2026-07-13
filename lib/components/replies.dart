@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:inter_knot/components/avatar.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/my_chip.dart';
 import 'package:inter_knot/components/rich_text/ik_content_text.dart';
 import 'package:inter_knot/constants/globals.dart';
@@ -76,6 +77,8 @@ class _RepliesState extends State<Replies> {
   }
 
   Widget _buildImageGrid(BuildContext context, List<String> images) {
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheSize = (96 * dpr).ceil().clamp(1, 9999);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -90,12 +93,14 @@ class _RepliesState extends State<Replies> {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              url,
+            child: CachedImage(
+              url: url,
               width: 96,
               height: 96,
+              cacheWidth: cacheSize,
+              cacheHeight: cacheSize,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
+              errorBuilder: (_) => Container(
                 width: 96,
                 height: 96,
                 color: Colors.grey[800],

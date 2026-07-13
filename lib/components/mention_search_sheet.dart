@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/models/mention_candidate.dart';
 
 /// @ 提及用户搜索底部弹窗。
@@ -165,8 +166,14 @@ class _MentionSearchSheetState extends State<MentionSearchSheet> {
         child: Icon(Icons.person, color: Colors.grey, size: 20),
       );
     }
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return CircleAvatar(
-      backgroundImage: NetworkImage(url),
+      backgroundImage: cachedImageProvider(
+        url,
+        width: 40,
+        height: 40,
+        dpr: dpr,
+      )!,
       onBackgroundImageError: (_, __) {},
     );
   }
