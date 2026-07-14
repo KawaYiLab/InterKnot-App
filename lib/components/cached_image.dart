@@ -1,8 +1,12 @@
-import 'dart:typed_data';
+import 'dart:async' show StreamController, StreamSubscription, scheduleMicrotask;
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Maximum decoded dimension for any cached image. Keeps the [ImageCache]
 /// entries bounded and prevents OOM from decoding full-resolution uploads.
@@ -20,7 +24,10 @@ ImageProvider? cachedImageProvider(
   ImageProvider? imageProvider,
 }) {
   if (url != null && url.trim().isNotEmpty) {
-    imageProvider = CachedNetworkImageProvider(url.trim(), headers: headers);
+    imageProvider = createNetworkImageProvider(
+      url.trim(),
+      headers: headers,
+    );
   } else if (bytes != null && bytes.isNotEmpty) {
     imageProvider = MemoryImage(bytes);
   }
@@ -35,6 +42,19 @@ ImageProvider? cachedImageProvider(
   cacheWidth = cacheWidth?.clamp(1, maxCacheDimension);
   cacheHeight = cacheHeight?.clamp(1, maxCacheDimension);
 
+  if (imageProvider is SingleFrameNetworkImageProvider) {
+    final targetWidth = cacheWidth?.toDouble() ?? maxCacheDimension.toDouble();
+    final targetHeight = cacheHeight?.toDouble() ?? maxCacheDimension.toDouble();
+    return SingleFrameNetworkImageProvider(
+      imageProvider.url,
+      headers: imageProvider.headers,
+      scale: imageProvider.scale,
+      cacheKey: imageProvider.cacheKey,
+      targetSize: Size(targetWidth, targetHeight),
+      targetDpr: dpr ?? 1.0,
+    );
+  }
+
   if (cacheWidth == null && cacheHeight == null) return imageProvider;
 
   return ResizeImage(
@@ -43,6 +63,29 @@ ImageProvider? cachedImageProvider(
     height: cacheHeight,
     policy: ResizeImagePolicy.fit,
     allowUpscaling: true,
+  );
+}
+
+ImageProvider createNetworkImageProvider(
+  String url, {
+  Map<String, String>? headers,
+  double scale = 1.0,
+  String? cacheKey,
+}) {
+  final uri = Uri.tryParse(url);
+  if (uri != null && uri.path.toLowerCase().endsWith('.gif')) {
+    return SingleFrameNetworkImageProvider(
+      url,
+      headers: headers,
+      scale: scale,
+      cacheKey: cacheKey,
+    );
+  }
+  return CachedNetworkImageProvider(
+    url,
+    headers: headers,
+    scale: scale,
+    cacheKey: cacheKey,
   );
 }
 
@@ -181,7 +224,10 @@ class _CachedImageState extends State<CachedImage> {
 
   ImageProvider? _createInnerProvider() {
     if (widget.url != null && widget.url!.trim().isNotEmpty) {
-      return CachedNetworkImageProvider(widget.url!.trim(), headers: widget.headers);
+      return createNetworkImageProvider(
+        widget.url!.trim(),
+        headers: widget.headers,
+      );
     }
     if (widget.bytes != null && widget.bytes!.isNotEmpty) {
       return MemoryImage(widget.bytes!);
@@ -193,6 +239,8 @@ class _CachedImageState extends State<CachedImage> {
     ImageProvider inner,
     double dpr,
   ) {
+    if (inner is SingleFrameNetworkImageProvider) return inner;
+
     final width = widget.cacheWidth ??
         (widget.width != null ? (widget.width! * dpr).ceil() : null);
     final height = widget.cacheHeight ??
@@ -252,10 +300,33 @@ class _CachedImageState extends State<CachedImage> {
       return _buildError(context);
     }
 
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+
     if (_hasFixedSize) {
       final provider = _provider;
       if (provider == null) return _buildError(context);
-      return _buildImage(context, provider);
+
+      double? imageWidth = widget.width;
+      double? imageHeight = widget.height;
+      if (imageWidth == null || imageHeight == null) {
+        if (widget.cacheWidth != null && widget.cacheHeight != null) {
+          imageWidth ??= widget.cacheWidth! / dpr;
+          imageHeight ??= widget.cacheHeight! / dpr;
+        } else if (widget.cacheWidth != null) {
+          imageWidth ??= widget.cacheWidth! / dpr;
+          imageHeight ??= widget.cacheWidth! / dpr;
+        } else if (widget.cacheHeight != null) {
+          imageWidth ??= widget.cacheHeight! / dpr;
+          imageHeight ??= widget.cacheHeight! / dpr;
+        }
+      }
+
+      return _buildImage(
+        context,
+        provider,
+        imageWidth: imageWidth,
+        imageHeight: imageHeight,
+      );
     }
 
     return LayoutBuilder(
@@ -271,24 +342,34 @@ class _CachedImageState extends State<CachedImage> {
         final width = (maxWidth * dpr).ceil().clamp(1, maxCacheDimension);
         final height = (maxHeight * dpr).ceil().clamp(1, maxCacheDimension);
 
-        final provider = ResizeImage(
-          inner,
-          width: width,
-          height: height,
-          policy: ResizeImagePolicy.fit,
-          allowUpscaling: true,
-        );
+        final ImageProvider provider;
+        if (inner is SingleFrameNetworkImageProvider) {
+          provider = inner;
+        } else {
+          provider = ResizeImage(
+            inner,
+            width: width,
+            height: height,
+            policy: ResizeImagePolicy.fit,
+            allowUpscaling: true,
+          );
+        }
 
         return _buildImage(context, provider);
       },
     );
   }
 
-  Widget _buildImage(BuildContext context, ImageProvider provider) {
+  Widget _buildImage(
+    BuildContext context,
+    ImageProvider provider, {
+    double? imageWidth,
+    double? imageHeight,
+  }) {
     return Image(
       image: provider,
-      width: widget.width,
-      height: widget.height,
+      width: imageWidth ?? widget.width,
+      height: imageHeight ?? widget.height,
       fit: widget.fit,
       alignment: widget.alignment,
       filterQuality: widget.filterQuality,
@@ -339,5 +420,232 @@ class _CachedImageState extends State<CachedImage> {
       return widget.errorBuilder!(context);
     }
     return const SizedBox.shrink();
+  }
+}
+
+class SingleFrameNetworkImageProvider
+    extends ImageProvider<SingleFrameNetworkImageProvider> {
+  const SingleFrameNetworkImageProvider(
+    this.url, {
+    this.headers,
+    this.scale = 1.0,
+    this.cacheKey,
+    this.targetSize = const Size(2048.0, 2048.0),
+    this.targetDpr = 1.0,
+  });
+
+  final String url;
+  final Map<String, String>? headers;
+  final double scale;
+  final String? cacheKey;
+  final Size targetSize;
+  final double targetDpr;
+
+  @override
+  Future<SingleFrameNetworkImageProvider> obtainKey(
+    ImageConfiguration configuration,
+  ) {
+    final dpr = configuration.devicePixelRatio ?? targetDpr;
+    final size = configuration.size;
+    final logicalTargetSize = size == null
+        ? targetSize
+        : Size(
+            (size.width * dpr).clamp(1.0, maxCacheDimension.toDouble()),
+            (size.height * dpr).clamp(1.0, maxCacheDimension.toDouble()),
+          );
+    return SynchronousFuture<SingleFrameNetworkImageProvider>(
+      SingleFrameNetworkImageProvider(
+        url,
+        headers: headers,
+        scale: scale,
+        cacheKey: cacheKey,
+        targetSize: logicalTargetSize,
+        targetDpr: dpr,
+      ),
+    );
+  }
+
+  @override
+  ImageStreamCompleter loadImage(
+    SingleFrameNetworkImageProvider key,
+    ImageDecoderCallback decode,
+  ) {
+    final chunkEvents = StreamController<ImageChunkEvent>();
+    final image = _loadImage(key, decode, chunkEvents);
+    return SingleFrameNetworkImageStreamCompleter(
+      image: image,
+      chunkEvents: chunkEvents.stream,
+      informationCollector: () => <DiagnosticsNode>[
+        DiagnosticsProperty<ImageProvider>('Image provider', this),
+        DiagnosticsProperty<SingleFrameNetworkImageProvider>('Image key', key),
+      ],
+    );
+  }
+
+  Future<ImageInfo> _loadImage(
+    SingleFrameNetworkImageProvider key,
+    ImageDecoderCallback decode,
+    StreamController<ImageChunkEvent> chunkEvents,
+  ) async {
+    final manager = DefaultCacheManager();
+    try {
+      await for (final FileResponse response in manager.getFileStream(
+        key.url,
+        headers: key.headers,
+        key: key.cacheKey,
+        withProgress: true,
+      )) {
+        if (response is DownloadProgress) {
+          if (!chunkEvents.isClosed) {
+            chunkEvents.add(ImageChunkEvent(
+              cumulativeBytesLoaded: response.downloaded,
+              expectedTotalBytes: response.totalSize,
+            ));
+          }
+        } else if (response is FileInfo) {
+          final bytes = await response.file.readAsBytes();
+          final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+          final codec = await decode(buffer);
+          final frame = await codec.getNextFrame();
+
+          final originalImage = frame.image;
+          final originalWidth = originalImage.width;
+          final originalHeight = originalImage.height;
+
+          final targetWidth = key.targetSize.width.clamp(
+            1.0,
+            maxCacheDimension.toDouble(),
+          );
+          final targetHeight = key.targetSize.height.clamp(
+            1.0,
+            maxCacheDimension.toDouble(),
+          );
+
+          final scale = math.min(
+            targetWidth / originalWidth,
+            targetHeight / originalHeight,
+          );
+          final scaledWidth = math.min(
+            maxCacheDimension,
+            math.max(1, (originalWidth * scale).ceil()),
+          );
+          final scaledHeight = math.min(
+            maxCacheDimension,
+            math.max(1, (originalHeight * scale).ceil()),
+          );
+
+          final recorder = ui.PictureRecorder();
+          final canvas = ui.Canvas(recorder);
+          final paint = ui.Paint()
+            ..filterQuality = ui.FilterQuality.high;
+          canvas.drawImageRect(
+            originalImage,
+            Rect.fromLTRB(0, 0, originalWidth.toDouble(), originalHeight.toDouble()),
+            Rect.fromLTRB(0, 0, scaledWidth.toDouble(), scaledHeight.toDouble()),
+            paint,
+          );
+          final picture = recorder.endRecording();
+          final scaledImage = await picture.toImage(scaledWidth, scaledHeight);
+          picture.dispose();
+          originalImage.dispose();
+          codec.dispose();
+
+          if (!chunkEvents.isClosed) {
+            await chunkEvents.close();
+          }
+          return ImageInfo(
+            image: scaledImage,
+            scale: key.targetDpr,
+            debugLabel: key.url,
+          );
+        }
+      }
+      throw StateError(
+        'Image stream completed without returning a file for ${key.url}',
+      );
+    } on Object catch (error, stackTrace) {
+      scheduleMicrotask(() {
+        PaintingBinding.instance.imageCache.evict(key);
+      });
+      if (!chunkEvents.isClosed) {
+        await chunkEvents.close();
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! SingleFrameNetworkImageProvider) return false;
+    return (cacheKey ?? url) == (other.cacheKey ?? other.url) &&
+        scale == other.scale &&
+        targetSize == other.targetSize &&
+        targetDpr == other.targetDpr;
+  }
+
+  @override
+  int get hashCode => Object.hash(cacheKey ?? url, scale, targetSize, targetDpr);
+
+  @override
+  String toString() =>
+      '${objectRuntimeType(this, 'SingleFrameNetworkImageProvider')}'
+      '(url: "$url", scale: $scale, targetSize: $targetSize, targetDpr: $targetDpr)';
+}
+
+class SingleFrameNetworkImageStreamCompleter extends ImageStreamCompleter {
+  SingleFrameNetworkImageStreamCompleter({
+    required Future<ImageInfo> image,
+    required Stream<ImageChunkEvent> chunkEvents,
+    InformationCollector? informationCollector,
+  }) {
+    StreamSubscription<ImageChunkEvent>? chunkSubscription;
+
+    void stopListening() {
+      chunkSubscription?.cancel();
+      chunkSubscription = null;
+    }
+
+    chunkSubscription = chunkEvents.listen(
+      (ImageChunkEvent event) {
+        try {
+          reportImageChunkEvent(event);
+        } on StateError {
+          stopListening();
+        }
+      },
+      onDone: stopListening,
+      onError: (Object error, StackTrace stack) {
+        // Errors from the chunk stream are surfaced through the image future.
+      },
+    );
+
+    addOnLastListenerRemovedCallback(stopListening);
+
+    image.then<void>(
+      (ImageInfo info) {
+        stopListening();
+        try {
+          setImage(info);
+        } on StateError {
+          info.dispose();
+        }
+      },
+      onError: (Object error, StackTrace stack) {
+        stopListening();
+        try {
+          reportError(
+            context: ErrorDescription(
+              'resolving a single-frame network image stream',
+            ),
+            exception: error,
+            stack: stack,
+            informationCollector: informationCollector,
+            silent: true,
+          );
+        } on StateError {
+          // The completer was disposed before the error could be reported.
+        }
+      },
+    );
   }
 }

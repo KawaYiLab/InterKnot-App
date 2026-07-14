@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -163,18 +162,22 @@ class _ImageViewerState extends State<ImageViewer>
   }
 
   ImageProvider _getImageProvider(String url) =>
-      _imageProviders.putIfAbsent(url, () => CachedNetworkImageProvider(url));
+      _imageProviders.putIfAbsent(url, () => createNetworkImageProvider(url));
 
   ImageProvider _getResizedImageProvider(String url) =>
       _resizedImageProviders.putIfAbsent(
         url,
-        () => ResizeImage(
-          _getImageProvider(url),
-          width: maxCacheDimension,
-          height: maxCacheDimension,
-          policy: ResizeImagePolicy.fit,
-          allowUpscaling: true,
-        ),
+        () {
+          final provider = _getImageProvider(url);
+          if (provider is SingleFrameNetworkImageProvider) return provider;
+          return ResizeImage(
+            provider,
+            width: maxCacheDimension,
+            height: maxCacheDimension,
+            policy: ResizeImagePolicy.fit,
+            allowUpscaling: true,
+          );
+        },
       );
 
   void _onPageChanged(int index) {
@@ -495,60 +498,38 @@ class _ImageViewerState extends State<ImageViewer>
 
                                               return PhotoViewGalleryPageOptions
                                                   .customChild(
-                                                child: StreamBuilder<
-                                                    PhotoViewControllerValue>(
-                                                  stream: _photoControllers[
-                                                          index]
-                                                      .outputStateStream,
-                                                  initialData: _photoControllers[
-                                                          index]
-                                                      .value,
-                                                  builder: (context, snapshot) {
-                                                    final scale = snapshot.data
-                                                            ?.scale ??
-                                                        _calculateContainedScale(
-                                                          MediaQuery.of(context)
-                                                              .size,
-                                                          Size(side, side),
-                                                        );
-                                                    final imageSize =
-                                                        side * scale;
-                                                    return Image(
-                                                      image: _getResizedImageProvider(
-                                                          url),
-                                                      width: imageSize,
-                                                      height: imageSize,
-                                                      fit: BoxFit.contain,
-                                                      filterQuality:
-                                                          FilterQuality.medium,
-                                                      gaplessPlayback: true,
-                                                      loadingBuilder: (context,
-                                                              child,
-                                                              progress) =>
-                                                          progress == null
-                                                              ? child
-                                                              : const Center(
-                                                                  child:
-                                                                      SizedBox(
-                                                                    width: 20,
-                                                                    height: 20,
-                                                                    child: CircularProgressIndicator(
-                                                                      strokeWidth:
-                                                                          2,
-                                                                    ),
-                                                                  ),
+                                                child: Image(
+                                                  image: _getResizedImageProvider(
+                                                      url),
+                                                  width: side,
+                                                  height: side,
+                                                  fit: BoxFit.contain,
+                                                  filterQuality:
+                                                      FilterQuality.high,
+                                                  gaplessPlayback: true,
+                                                  loadingBuilder: (context,
+                                                          child,
+                                                          progress) =>
+                                                      progress == null
+                                                          ? child
+                                                          : const Center(
+                                                              child: SizedBox(
+                                                                width: 20,
+                                                                height: 20,
+                                                                child: CircularProgressIndicator(
+                                                                  strokeWidth: 2,
                                                                 ),
-                                                      errorBuilder: (context,
-                                                              error,
-                                                              stackTrace) =>
-                                                          const Center(
-                                                        child: Icon(
-                                                          Icons.broken_image,
-                                                          color: Colors.white,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  },
+                                                              ),
+                                                            ),
+                                                  errorBuilder: (context,
+                                                          error,
+                                                          stackTrace) =>
+                                                      const Center(
+                                                    child: Icon(
+                                                      Icons.broken_image,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
                                                 ),
                                                 childSize: Size(side, side),
                                                 initialScale:
