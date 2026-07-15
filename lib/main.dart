@@ -516,3 +516,4 @@ Widget _buildBadge(int count) {
     ),
   );
 }
+

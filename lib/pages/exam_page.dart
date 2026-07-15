@@ -6,6 +6,7 @@ import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/toast.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 
 class ExamPage extends StatefulWidget {
   const ExamPage({super.key});
@@ -356,6 +357,10 @@ class _ExamPageState extends State<ExamPage> {
   Widget _buildQuestions() {
     final exam = _exam!;
     final questions = exam.questions;
+    final answeredCount = _answers.values.where((l) => l.isNotEmpty).length;
+    final percent = questions.isEmpty
+        ? 0.0
+        : (answeredCount / questions.length) * 100;
     final allAnswered = questions.every((q) {
       final list = _answers[q.questionId] ?? [];
       return list.isNotEmpty;
@@ -384,10 +389,17 @@ class _ExamPageState extends State<ExamPage> {
               ),
               const Spacer(),
               Text(
-                '已答 ${_answers.values.where((l) => l.isNotEmpty).length}/${questions.length}',
+                '已答 $answeredCount/${questions.length}',
                 style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: ZzzProgress(
+            percent: percent,
+            color: const Color(0xffBFFF09),
           ),
         ),
         Expanded(
@@ -562,76 +574,27 @@ class _QuestionCard extends StatelessWidget {
   }
 
   Widget _buildOption(ExamOption option, bool isSelected, bool isMultiple) {
-    return InkWell(
-      onTap: () => onTap(option.key),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xffD7FF00).withValues(alpha: 0.12)
-              : const Color(0xff252525),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? const Color(0xffD7FF00) : const Color(0xff2A2A2A),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isMultiple
-                  ? (isSelected
-                      ? Icons.check_box_rounded
-                      : Icons.check_box_outline_blank_rounded)
-                  : (isSelected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_off_rounded),
-              color: isSelected ? const Color(0xffD7FF00) : Colors.grey,
-              size: 18,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                option.text,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xffCCCCCC),
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ZzzCheckbox<String>(
+        value: option.key,
+        checked: isSelected,
+        onChanged: (_) => onTap(option.key),
+        label: option.text,
+        shape: ZzzRadioShape.button,
       ),
     );
   }
 
   Widget _buildBooleanOption(ExamOption option, bool isSelected) {
-    return InkWell(
-      onTap: () => onTap(option.key),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xffD7FF00).withValues(alpha: 0.12)
-              : const Color(0xff252525),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? const Color(0xffD7FF00) : const Color(0xff2A2A2A),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            option.text,
-            style: TextStyle(
-              color: isSelected ? const Color(0xffD7FF00) : Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-        ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ZzzCheckbox<String>(
+        value: option.key,
+        checked: isSelected,
+        onChanged: (_) => onTap(option.key),
+        label: option.text,
+        shape: ZzzRadioShape.button,
       ),
     );
   }
