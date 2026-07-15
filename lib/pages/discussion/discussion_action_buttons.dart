@@ -17,6 +17,7 @@ import 'package:inter_knot/helpers/dialog_helper.dart';
 import 'package:inter_knot/helpers/share_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/discussion.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/models/mention_candidate.dart';
 import 'package:inter_knot/pages/create_discussion_page.dart';
@@ -757,13 +758,11 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   Widget _buildMobileMoreButton() {
     final isOwner =
         c.user.value?.login == widget.discussion.author.login;
-    return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert, color: Color(0xffB0B0B0), size: 24),
-      iconColor: const Color(0xffB0B0B0),
-      color: const Color(0xff1a1a1a),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      onSelected: (value) {
-        switch (value) {
+    return ZzzDropdown(
+      trigger: 'click',
+      onCommand: (value) {
+        final command = value?.toString();
+        switch (command) {
           case 'report':
             _handleReport();
             break;
@@ -781,15 +780,16 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
             break;
         }
       },
-      itemBuilder: (context) => [
-        if (!isOwner) const PopupMenuItem(value: 'report', child: Text('举报帖子')),
+      child: const Icon(Icons.more_vert, color: Color(0xffB0B0B0), size: 24),
+      items: [
+        if (!isOwner) const ZzzDropdownItem(command: 'report', label: '举报帖子'),
         if (isOwner) ...[
-          const PopupMenuItem(value: 'edit', child: Text('编辑帖子')),
+          const ZzzDropdownItem(command: 'edit', label: '编辑帖子'),
           if (!widget.discussion.isEditableDraft)
-            const PopupMenuItem(value: 'unpublish', child: Text('撤稿')),
-          const PopupMenuItem(value: 'delete', child: Text('删除帖子')),
+            const ZzzDropdownItem(command: 'unpublish', label: '撤稿'),
+          const ZzzDropdownItem(command: 'delete', label: '删除帖子'),
         ],
-        const PopupMenuItem(value: 'share', child: Text('分享')),
+        const ZzzDropdownItem(command: 'share', label: '分享'),
       ],
     );
   }

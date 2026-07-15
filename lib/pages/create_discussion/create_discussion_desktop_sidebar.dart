@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 
 class CreateDiscussionDesktopSidebar extends StatelessWidget {
   const CreateDiscussionDesktopSidebar({
@@ -33,25 +34,27 @@ class CreateDiscussionDesktopSidebar extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: ListView(
+          child: ZzzMenu(
+            active: selectedIndex,
+            onChange: onSelectPage,
             children: [
-              ListTile(
-                leading: const Icon(Icons.article_outlined),
-                title: const Text('正文'),
-                selected: selectedIndex == 0,
+              ZzzMenuItem(
+                name: 0,
+                label: '正文',
+                active: selectedIndex == 0,
                 onTap: () => onSelectPage(0),
               ),
-              ListTile(
-                leading: const Icon(Icons.image_outlined),
-                title: const Text('封面'),
-                selected: selectedIndex == 1,
+              ZzzMenuItem(
+                name: 1,
+                label: '封面',
+                active: selectedIndex == 1,
                 onTap: () => onSelectPage(1),
               ),
               if (showDrafts)
-                ListTile(
-                  leading: const Icon(Icons.drafts_outlined),
-                  title: const Text('草稿'),
-                  selected: selectedIndex == 2,
+                ZzzMenuItem(
+                  name: 2,
+                  label: '草稿',
+                  active: selectedIndex == 2,
                   onTap: () => onSelectPage(2),
                 ),
             ],

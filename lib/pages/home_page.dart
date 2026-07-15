@@ -18,6 +18,7 @@ import 'package:inter_knot/utils/level_utils.dart';
 
 import 'package:inter_knot/pages/level_page.dart';
 import 'package:inter_knot/pages/my_page_desktop.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -518,12 +519,19 @@ class _HomePageState extends State<HomePage>
           children: [
             fixedHeader,
             Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                child: scrollableContent,
+              child: ZzzScrollbar(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: scrollableContent,
+                ),
               ),
             ),
           ],
+        ),
+        ZzzBacktop(
+          scrollController: scrollController,
+          right: 16,
+          bottom: 95,
         ),
       ],
     );

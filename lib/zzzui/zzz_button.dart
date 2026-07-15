@@ -342,10 +342,12 @@ class _ZzzButtonState extends State<ZzzButton>
           borderRadius: borderRadius,
         ),
         child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: innerPadding + size.paddingX,
-            vertical: innerPadding + size.paddingY,
-          ),
+          padding: widget.circle
+              ? EdgeInsets.all(innerPadding + size.paddingY)
+              : EdgeInsets.symmetric(
+                  horizontal: innerPadding + size.paddingX,
+                  vertical: innerPadding + size.paddingY,
+                ),
           child: content,
         ),
       ),
