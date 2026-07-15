@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
+import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/click_region.dart';
 import 'package:inter_knot/components/emote_picker.dart';
 import 'package:inter_knot/components/mention_search_sheet.dart';
+import 'package:inter_knot/components/report_sheet.dart';
 import 'package:inter_knot/components/triple_action_button.dart';
 import 'package:inter_knot/constants/api_config.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/content_segments.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
+import 'package:inter_knot/helpers/share_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
@@ -39,12 +42,14 @@ class DiscussionActionButtons extends StatefulWidget {
     required this.hData,
     this.onCommentAdded,
     this.onEditSuccess,
+    this.isMobile = false,
   });
 
   final DiscussionModel discussion;
   final HDataModel hData;
   final VoidCallback? onCommentAdded;
   final VoidCallback? onEditSuccess;
+  final bool isMobile;
 
   @override
   State<DiscussionActionButtons> createState() =>
@@ -59,6 +64,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
   bool _isWriting = false;
   bool _isLoading = false;
   bool _isOverlayOpen = false;
+  bool _isAnonymous = false;
   String? _parentId;
   String? _replyToUser;
   String? _replyToAuthorId;
@@ -89,6 +95,15 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       curve: Curves.easeIn,
     );
     _controller.value = 1.0;
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus && !_isWriting) {
+        setState(() {
+          _isWriting = true;
+        });
+        _controller.reverse();
+      }
+    });
   }
 
   Future<void> replyTo(
@@ -107,6 +122,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
               ? authorDocumentId
               : null;
       _isWriting = true;
+      _isAnonymous = false;
       _addReplyPrefix = addPrefix;
     });
     _controller.reverse();
@@ -192,6 +208,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
         authorId: authorId,
         parentId: _parentId,
         imageIds: imageIds,
+        isAnonymous: widget.isMobile ? _isAnonymous : false,
       );
 
       if (res.hasError) {
@@ -256,6 +273,7 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
       _replyToUser = null;
       _replyToAuthorId = null;
       _addReplyPrefix = false;
+      _isAnonymous = false;
       _imageUploads.clear();
     });
     _textController.clear();
@@ -625,8 +643,415 @@ class DiscussionActionButtonsState extends State<DiscussionActionButtons>
     );
   }
 
+  Future<void> _handleDenny() async {
+    if (!await c.ensureLogin()) return;
+
+    final prevHasGiven = widget.discussion.hasGivenDenny;
+    final prevDennyCount = widget.discussion.dennyCount;
+    final prevUserDenny = c.user.value?.denny ?? 0;
+
+    widget.discussion.hasGivenDenny = true;
+    widget.discussion.dennyCount++;
+    widget.hData.hasGivenDenny = true;
+    widget.hData.dennyCount++;
+    if (c.user.value != null && prevUserDenny > 0) {
+      c.user.value!.denny = prevUserDenny - 1;
+      c.user.refresh();
+    }
+    if (mounted) setState(() {});
+
+    try {
+      final result = await api.giveDennyToArticle(widget.discussion.id);
+      if (result.newBalance != null) {
+        c.user.value?.denny = result.newBalance;
+        c.user.refresh();
+      }
+      if (result.articleDennyCount != null) {
+        widget.discussion.dennyCount = result.articleDennyCount!;
+        widget.hData.dennyCount = result.articleDennyCount!;
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      widget.discussion.hasGivenDenny = prevHasGiven;
+      widget.discussion.dennyCount = prevDennyCount;
+      widget.hData.hasGivenDenny = prevHasGiven;
+      widget.hData.dennyCount = prevDennyCount;
+      c.user.value?.denny = prevUserDenny;
+      c.user.refresh();
+      showToast('投币失败: $e', isError: true);
+    }
+  }
+
+  Future<void> _handleReport() async {
+    if (!await c.ensureLogin()) return;
+    if (!mounted) return;
+    showReportSheet(
+      context,
+      targetType: 'article',
+      targetId: widget.discussion.id,
+    );
+  }
+
+  Widget _buildMobileFavoriteButton() {
+    return Obx(() {
+      final isLiked =
+          c.bookmarks.map((e) => e.id).contains(widget.discussion.id);
+      final count = widget.hData.favoritesCount;
+      return ClickRegion(
+        onTap: () => c.toggleFavorite(widget.hData),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isLiked ? Icons.favorite : Icons.favorite_outline,
+              color: isLiked ? Colors.red : const Color(0xffB0B0B0),
+              size: 24,
+            ),
+            if (count > 0)
+              Text(
+                count.toString(),
+                style: TextStyle(
+                  color: isLiked ? Colors.red : const Color(0xffB0B0B0),
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildMobileDennyButton() {
+    final hasGiven = widget.discussion.hasGivenDenny;
+    final count = widget.discussion.dennyCount;
+    return ClickRegion(
+      onTap: _handleDenny,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Opacity(
+            opacity: hasGiven ? 1.0 : 0.6,
+            child: SizedBox(
+              width: 24,
+              height: 24,
+              child: Image.asset('assets/images/dennies_v2.webp'),
+            ),
+          ),
+          if (count > 0)
+            Text(
+              count.toString(),
+              style: TextStyle(
+                color: hasGiven
+                    ? const Color(0xffD7FF00)
+                    : const Color(0xffB0B0B0),
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileMoreButton() {
+    final isOwner =
+        c.user.value?.login == widget.discussion.author.login;
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, color: Color(0xffB0B0B0), size: 24),
+      iconColor: const Color(0xffB0B0B0),
+      color: const Color(0xff1a1a1a),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: (value) {
+        switch (value) {
+          case 'report':
+            _handleReport();
+            break;
+          case 'edit':
+            _handleEdit();
+            break;
+          case 'unpublish':
+            _handleUnpublish();
+            break;
+          case 'delete':
+            _handleDelete();
+            break;
+          case 'share':
+            ShareHelper.sharePost(widget.discussion.id);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isOwner) const PopupMenuItem(value: 'report', child: Text('举报帖子')),
+        if (isOwner) ...[
+          const PopupMenuItem(value: 'edit', child: Text('编辑帖子')),
+          if (!widget.discussion.isEditableDraft)
+            const PopupMenuItem(value: 'unpublish', child: Text('撤稿')),
+          const PopupMenuItem(value: 'delete', child: Text('删除帖子')),
+        ],
+        const PopupMenuItem(value: 'share', child: Text('分享')),
+      ],
+    );
+  }
+
+  Widget _buildMobileReplyHint() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              '回复 @$_replyToUser',
+              style: const TextStyle(
+                color: Color(0xffB0B0B0),
+                fontSize: 13,
+              ),
+            ),
+          ),
+          ClickRegion(
+            onTap: () {
+              setState(() {
+                _parentId = null;
+                _replyToUser = null;
+                _replyToAuthorId = null;
+                _addReplyPrefix = false;
+              });
+              _focusNode.requestFocus();
+            },
+            child: const Icon(
+              Icons.close,
+              color: Color(0xffB0B0B0),
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobilePlaceholder() {
+    final count = widget.discussion.commentsCount;
+    final avatarUrl = c.user.value?.avatar ?? '';
+    return Row(
+      children: [
+        if (avatarUrl.isNotEmpty)
+          Avatar(avatarUrl, size: 24)
+        else
+          const CircleAvatar(
+            radius: 12,
+            backgroundColor: Color(0xff2D2D2D),
+            child: Icon(Icons.person, size: 14, color: Colors.grey),
+          ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Text(
+            '说点什么...',
+            style: TextStyle(
+              color: Color(0xff808080),
+              fontSize: 16,
+            ),
+          ),
+        ),
+        if (count > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xff2D2D2D),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              count.toString(),
+              style: const TextStyle(
+                color: Color(0xffB0B0B0),
+                fontSize: 12,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMobileInputBox() {
+    final isActive = _isWriting || _textController.text.isNotEmpty;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        color: const Color(0xff222222),
+        borderRadius: BorderRadius.circular(isActive ? 12 : 999),
+        border: Border.all(color: const Color(0xff2D2D2D), width: 4),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_replyToUser != null) _buildMobileReplyHint(),
+          Stack(
+            children: [
+              TextField(
+                controller: _textController,
+                focusNode: _focusNode,
+                onChanged: (_) => setState(() {}),
+                style: const TextStyle(fontSize: 16, color: Colors.white),
+                cursorColor: Colors.white,
+                minLines: 1,
+                maxLines: 3,
+                keyboardType: TextInputType.multiline,
+                decoration: const InputDecoration.collapsed(hintText: ''),
+              ),
+              if (!isActive)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: _buildMobilePlaceholder(),
+                  ),
+                ),
+            ],
+          ),
+          if (_imageUploads.isNotEmpty) _buildImagePreviews(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileActionToolbar() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ClickRegion(
+          onTap: _pickImages,
+          child: const Icon(
+            Icons.image_outlined,
+            color: Color(0xff808080),
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 16),
+        ClickRegion(
+          onTap: _openMentionPicker,
+          child: const Icon(
+            Icons.alternate_email,
+            color: Color(0xff808080),
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 16),
+        ClickRegion(
+          onTap: _openEmotePicker,
+          child: const Icon(
+            Icons.emoji_emotions_outlined,
+            color: Color(0xff808080),
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 16),
+        ClickRegion(
+          onTap: () => setState(() => _isAnonymous = !_isAnonymous),
+          child: Icon(
+            Icons.visibility_off_outlined,
+            color: _isAnonymous
+                ? const Color(0xffBFFF09)
+                : const Color(0xff808080),
+            size: 22,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobile(BuildContext context) {
+    final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final canSend = _textController.text.trim().isNotEmpty ||
+        _imageUploads.isNotEmpty;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xff0a0a0a),
+        border: Border(
+          top: BorderSide(color: Color(0xff202020), width: 1),
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomPadding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: _buildMobileInputBox()),
+              const SizedBox(width: 8),
+              SizeTransition(
+                axis: Axis.horizontal,
+                sizeFactor: _controller,
+                axisAlignment: 1.0,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildTripleActionButton(),
+                    const SizedBox(width: 12),
+                    _buildMobileDennyButton(),
+                    const SizedBox(width: 12),
+                    _buildMobileFavoriteButton(),
+                    const SizedBox(width: 4),
+                    _buildMobileMoreButton(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizeTransition(
+            axis: Axis.vertical,
+            sizeFactor: Tween(begin: 1.0, end: 0.0).animate(_controller),
+            axisAlignment: -1.0,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                children: [
+                  Expanded(child: _buildMobileActionToolbar()),
+                  TextButton(
+                    onPressed: _cancel,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xffbfbfbf),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: canSend && !_isLoading ? _submit : null,
+                    style: TextButton.styleFrom(
+                      backgroundColor:
+                          canSend ? const Color(0xffBFFF09) : const Color(0xff2D2D2D),
+                      foregroundColor:
+                          canSend ? Colors.black : const Color(0xff808080),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const Text('发送'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.isMobile) return _buildMobile(context);
     return TapRegion(
       onTapOutside: (_) {
         if (_isWriting && !_isOverlayOpen) _cancel();

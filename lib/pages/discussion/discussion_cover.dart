@@ -13,10 +13,16 @@ class Cover extends StatefulWidget {
     super.key,
     required this.discussion,
     this.onImageLoaded,
+    this.isMobile = false,
+    this.maxHeight,
+    this.borderRadius,
   });
 
   final DiscussionModel discussion;
   final void Function(double aspectRatio)? onImageLoaded;
+  final bool isMobile;
+  final double? maxHeight;
+  final BorderRadius? borderRadius;
 
   @override
   State<Cover> createState() => _CoverState();
@@ -38,9 +44,11 @@ class _CoverState extends State<Cover> {
   Widget build(BuildContext context) {
     final covers = widget.discussion.covers;
 
+    final coverRadius = widget.borderRadius ?? BorderRadius.circular(8);
+
     if (covers.isEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: coverRadius,
         child: Assets.images.defaultCover.image(fit: BoxFit.contain),
       );
     }
@@ -58,7 +66,7 @@ class _CoverState extends State<Cover> {
             heroTagPrefix: 'cover-${widget.discussion.id}',
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: coverRadius,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final dpr = MediaQuery.devicePixelRatioOf(context);
@@ -98,8 +106,9 @@ class _CoverState extends State<Cover> {
       );
     }
 
+    final multiHeight = widget.maxHeight ?? 220;
     return SizedBox(
-      height: 220,
+      height: multiHeight,
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
@@ -127,7 +136,7 @@ class _CoverState extends State<Cover> {
                       heroTagPrefix: 'cover-${widget.discussion.id}',
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: coverRadius,
                       child: NetworkImageBox(
                         url: url,
                         fit: BoxFit.contain,

@@ -210,28 +210,62 @@ class _DiscussionDetailBoxState extends State<DiscussionDetailBox> {
     launchUrlString(url);
   }
 
+  bool _bodyHasContent(DiscussionModel discussion) {
+    if (discussion.editorState != null && discussion.editorState!.isNotEmpty) {
+      return true;
+    }
+    final body = discussion.rawBodyText.trim();
+    if (body.isEmpty) return false;
+    final textOnly = body.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    return textOnly.isNotEmpty;
+  }
+
   @override
   Widget build(BuildContext context) {
     final discussion = widget.discussion;
+    final category = discussion.category;
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 16,
-        vertical: 32,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SelectableText(
-                discussion.title,
-                style: Theme.of(context).textTheme.headlineLarge,
-              ),
-              const SizedBox(height: 16),
-              _buildRichBody(discussion),
-            ],
+          Text.rich(
+            TextSpan(
+              children: [
+                if (category != null)
+                  TextSpan(
+                    text: '[ ${category.name} ] ',
+                    style: const TextStyle(
+                      color: Color(0xff808080),
+                      fontSize: 22,
+                      fontWeight: FontWeight.normal,
+                      height: 1.3,
+                    ),
+                  ),
+                TextSpan(
+                  text: discussion.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 16),
+          if (_bodyHasContent(discussion))
+            _buildRichBody(discussion)
+          else
+            const Text(
+              '啥都木有¯\\(°_o)/¯',
+              style: TextStyle(
+                color: Color(0xff808080),
+                fontSize: 16,
+                height: 1.7,
+              ),
+            ),
         ],
       ),
     );
