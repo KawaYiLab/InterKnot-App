@@ -62,6 +62,13 @@ class DiscussionGrid extends StatefulWidget {
     this.onOpenItem,
     this.compactMaxCrossAxisExtent,
     this.desktopMaxCrossAxisExtent,
+    this.crossAxisCount,
+    this.mainAxisSpacing,
+    this.crossAxisSpacing,
+    this.gridPadding,
+    this.shrinkWrap = false,
+    this.physics,
+    this.emptyMessage,
   });
 
   final Set<HDataModel> list;
@@ -71,6 +78,13 @@ class DiscussionGrid extends StatefulWidget {
   final bool reorderHistoryOnOpen;
   final double? compactMaxCrossAxisExtent;
   final double? desktopMaxCrossAxisExtent;
+  final int? crossAxisCount;
+  final double? mainAxisSpacing;
+  final double? crossAxisSpacing;
+  final EdgeInsets? gridPadding;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
+  final String? emptyMessage;
   final Future<void> Function(
     BuildContext context,
     HDataModel item,
@@ -225,8 +239,8 @@ class _DiscussionGridState extends State<DiscussionGrid>
                     ),
                   );
                 }
-                return const DiscussionEmptyState(
-                  message: '- 暂无相关帖子 -',
+                return DiscussionEmptyState(
+                  message: widget.emptyMessage ?? '- 暂无相关帖子 -',
                   textStyle: TextStyle(
                     color: Color.fromARGB(255, 233, 233, 233),
                     fontSize: 16,
@@ -243,11 +257,42 @@ class _DiscussionGridState extends State<DiscussionGrid>
       builder: (context, con) {
         final width = MediaQuery.of(context).size.width;
         final isCompact = width < 640;
-        final mainAxisSpacing = isCompact ? 10.0 : 12.0;
-        final crossAxisSpacing = isCompact ? 8.0 : 10.0;
-        final maxCrossAxisExtent = isCompact
-            ? (widget.compactMaxCrossAxisExtent ?? 273.0)
-            : (widget.desktopMaxCrossAxisExtent ?? 264.0);
+        final mainAxisSpacing = widget.mainAxisSpacing ??
+            (isCompact ? 10.0 : 12.0);
+        final crossAxisSpacing = widget.crossAxisSpacing ??
+            (isCompact ? 8.0 : 10.0);
+        final padding = widget.gridPadding ??
+            const EdgeInsets.fromLTRB(10, 16, 10, 10);
+        final physics = widget.physics ??
+            (widget.shrinkWrap
+                ? const NeverScrollableScrollPhysics()
+                : (!isCompact
+                    ? const NeverScrollableScrollPhysics()
+                    : const BouncingScrollPhysics()));
+
+        final maxCrossAxisExtent = widget.crossAxisCount == null
+            ? (isCompact
+                ? (widget.compactMaxCrossAxisExtent ?? 273.0)
+                : (widget.desktopMaxCrossAxisExtent ?? 264.0))
+            : null;
+
+        final gridDelegate = widget.crossAxisCount != null
+            ? SliverWaterfallFlowDelegateWithFixedCrossAxisCount(
+                crossAxisCount: widget.crossAxisCount!,
+                mainAxisSpacing: mainAxisSpacing,
+                crossAxisSpacing: crossAxisSpacing,
+                lastChildLayoutTypeBuilder: (index) => index == items.length
+                    ? LastChildLayoutType.foot
+                    : LastChildLayoutType.none,
+              )
+            : SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: maxCrossAxisExtent!,
+                mainAxisSpacing: mainAxisSpacing,
+                crossAxisSpacing: crossAxisSpacing,
+                lastChildLayoutTypeBuilder: (index) => index == items.length
+                    ? LastChildLayoutType.foot
+                    : LastChildLayoutType.none,
+              );
 
         final child = Center(
           child: ConstrainedBox(
@@ -264,18 +309,10 @@ class _DiscussionGridState extends State<DiscussionGrid>
               child: WaterfallFlow.builder(
                 controller: scrollController,
                 cacheExtent: 0.0,
-                physics: !isCompact
-                    ? const NeverScrollableScrollPhysics()
-                    : const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
-                gridDelegate: SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: maxCrossAxisExtent,
-                  mainAxisSpacing: mainAxisSpacing,
-                  crossAxisSpacing: crossAxisSpacing,
-                  lastChildLayoutTypeBuilder: (index) => index == items.length
-                      ? LastChildLayoutType.foot
-                      : LastChildLayoutType.none,
-                ),
+                shrinkWrap: widget.shrinkWrap,
+                physics: physics,
+                padding: padding,
+                gridDelegate: gridDelegate,
                 itemCount: items.length + 1,
                 itemBuilder: (context, index) {
                   if (index == items.length) {

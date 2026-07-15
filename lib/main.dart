@@ -20,6 +20,7 @@ import 'package:inter_knot/pages/create_discussion_page.dart';
 import 'package:inter_knot/pages/home_page.dart';
 import 'package:inter_knot/pages/level_page.dart';
 import 'package:inter_knot/pages/message_center_page.dart';
+import 'package:inter_knot/pages/profile_page.dart';
 import 'package:inter_knot/pages/search_page.dart';
 import 'package:inter_knot/services/update_service.dart';
 
@@ -277,11 +278,23 @@ class _MyHomePageState extends State<MyHomePage> {
                     },
                   ),
                   _BottomNavItem(
-                    isSelected: c.selectedIndex.value == 1,
+                    isSelected: false,
                     icon: Icons.person_outline,
                     activeIcon: Icons.person,
                     label: '我的',
-                    onTap: () => c.animateToPage(1, animate: false),
+                    onTap: () async {
+                      if (!await c.ensureLogin(context: context)) return;
+                      if (!context.mounted) return;
+                      final authorId = c.authorId.value ??
+                          c.user.value?.authorId;
+                      if (authorId != null && authorId.isNotEmpty) {
+                        navigateWithSlideTransition(
+                          context,
+                          ProfilePage(authorDocumentId: authorId),
+                          routeName: '/profile/me',
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
