@@ -7,6 +7,7 @@ import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 import 'package:inter_knot/utils/level_utils.dart';
 
 class ProfileSettingsPage extends StatefulWidget {
@@ -383,18 +384,30 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     // Visibility
-                    Obx(() => SwitchListTile(
-                          title: const Text(
-                            '主页隐身',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          subtitle: const Text(
-                            '开启后他人无法查看你的主页内容',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                          value: c.user.value?.profileHidden ?? false,
-                          activeColor: const Color(0xffD7FF00),
-                          onChanged: _toggleVisibility,
+                    Obx(() => Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '主页隐身',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '开启后他人无法查看你的主页内容',
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ZzzSwitch(
+                              value: c.user.value?.profileHidden ?? false,
+                              onChanged: _toggleVisibility,
+                            ),
+                          ],
                         )),
                     const SizedBox(height: 16),
                     // Avatar library

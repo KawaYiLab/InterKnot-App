@@ -5,7 +5,6 @@ import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/discussions_grid.dart';
-import 'package:inter_knot/components/pattern_painter.dart';
 import 'package:inter_knot/components/report_sheet.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/controllers/messaging_controller.dart';
@@ -15,6 +14,7 @@ import 'package:inter_knot/helpers/logger.dart';
 import 'package:inter_knot/helpers/share_helper.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/pages/discussion_page.dart';
@@ -695,7 +695,6 @@ class _ProfilePageState extends State<ProfilePage> {
             label: _isFollowing ? '已关注' : '关注',
             onTap: _isFollowingLoading ? null : _toggleFollow,
             isCompact: isCompact,
-            isPrimary: !_isFollowing,
           ),
         if (!_isHidden) ...[
           const SizedBox(width: 8),
@@ -714,34 +713,17 @@ class _ProfilePageState extends State<ProfilePage> {
     required VoidCallback? onTap,
     required bool isCompact,
     bool isPrimary = false,
+    bool highlight = false,
+    bool loading = false,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isCompact ? 12 : 16,
-            vertical: isCompact ? 6 : 8,
-          ),
-          decoration: BoxDecoration(
-            color: isPrimary ? const Color(0xffD7FF00) : const Color(0xff1a1a1a),
-            borderRadius: BorderRadius.circular(999),
-            border: isPrimary
-                ? null
-                : Border.all(color: const Color(0xff2a2a2a)),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isPrimary ? Colors.black : Colors.white,
-              fontSize: isCompact ? 13 : 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
+    return ZzzButton(
+      size: isCompact ? ZzzButtonSize.small : ZzzButtonSize.defaults,
+      type: isPrimary ? ZzzButtonType.success : ZzzButtonType.defaults,
+      highlight: highlight,
+      loading: loading,
+      disabled: onTap == null,
+      onPressed: onTap,
+      label: label,
     );
   }
 
@@ -1042,42 +1024,35 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget _buildBannerFooter(bool isCompact) {
     final hasBio = _bioText.isNotEmpty;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: CustomPaint(
-            painter: PatternPainter(
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
+    return ZzzPattern(
+      type: ZzzPatternType.squares,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 18 : 34,
+          vertical: 8,
+        ),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.black, width: 2),
           ),
         ),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.symmetric(
-            horizontal: isCompact ? 18 : 34,
-            vertical: 8,
+        child: Text(
+          hasBio ? _bioText : '这个人很神秘，什么都没有留下。',
+          style: TextStyle(
+            color: hasBio
+                ? Colors.white.withValues(alpha: 0.95)
+                : Colors.white.withValues(alpha: 0.35),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            height: 1.5,
+            fontStyle: hasBio ? FontStyle.normal : FontStyle.italic,
           ),
-          decoration: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.black, width: 2),
-            ),
-          ),
-          child: Text(
-            hasBio ? _bioText : '这个人很神秘，什么都没有留下。',
-            style: TextStyle(
-              color: hasBio
-                  ? Colors.white.withValues(alpha: 0.95)
-                  : Colors.white.withValues(alpha: 0.35),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              height: 1.5,
-              fontStyle: hasBio ? FontStyle.normal : FontStyle.italic,
-            ),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
         ),
-      ],
+      ),
     );
   }
 
@@ -1163,7 +1138,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   : '已签到${totalDays > 0 ? ' ($totalDays天)' : ''}',
               onTap: _checkInLoading ? null : _doCheckIn,
               isCompact: false,
-              isPrimary: canCheckIn && !_checkInLoading,
+              highlight: true,
+              loading: _checkInLoading,
             ),
           ],
         ),

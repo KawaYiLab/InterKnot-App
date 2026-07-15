@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 
 Future<void> showCreateDiscussionPostSettingsSheet({
   required BuildContext context,
@@ -69,13 +70,8 @@ Future<void> showCreateDiscussionPostSettingsSheet({
                           fontSize: 12,
                         ),
                       ),
-                      trailing: Switch(
+                      trailing: ZzzSwitch(
                         value: localCompress,
-                        thumbColor: WidgetStateProperty.resolveWith(
-                          (states) => states.contains(WidgetState.selected)
-                              ? const Color(0xffD7FF00)
-                              : null,
-                        ),
                         onChanged: (value) {
                           setSheetState(() {
                             localCompress = value;
