@@ -349,38 +349,19 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     const SizedBox(height: 24),
                     // Name
-                    TextField(
+                    ZzzInput(
                       controller: _nameController,
+                      hintText: '用户名',
                       maxLength: 20,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: '用户名',
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xffD7FF00)),
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 16),
                     // Bio
-                    TextField(
+                    ZzzInput(
                       controller: _bioController,
+                      hintText: '签名',
                       maxLength: 100,
-                      maxLines: 3,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: '签名',
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xffD7FF00)),
-                        ),
-                      ),
+                      minLines: 2,
+                      maxLines: 5,
                     ),
                     const SizedBox(height: 16),
                     // Visibility
