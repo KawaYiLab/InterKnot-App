@@ -7,6 +7,7 @@ import 'package:inter_knot/helpers/box.dart';
 import 'package:inter_knot/helpers/logger.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -186,19 +187,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Shared ZZZ style input decoration
-    final inputDecoration = InputDecoration(
-      labelStyle: const TextStyle(color: Color(0xff808080)),
-      enabledBorder: const OutlineInputBorder(
-        borderSide: BorderSide(color: Color(0xff333333)),
-      ),
-      focusedBorder: const OutlineInputBorder(
-        borderSide: BorderSide(color: Color(0xffD7FF00)),
-      ),
-      border: const OutlineInputBorder(),
-      prefixIconColor: const Color(0xffE0E0E0),
-    );
-
     // Using Scaffold with backgroundColor transparent to act as a dialog content
     return GestureDetector(
       onTap: () => Get.back(),
@@ -253,13 +241,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 16),
                           ],
-                          TextField(
+                          ZzzInput(
                             controller: emailController,
-                            style: const TextStyle(color: Color(0xffE0E0E0)),
-                            decoration: inputDecoration.copyWith(
-                              labelText: '邮箱',
-                              prefixIcon: const Icon(Icons.email),
-                            ),
+                            hintText: '邮箱',
+                            prefixIcon: Icons.email,
                             keyboardType: TextInputType.emailAddress,
                             textInputAction:
                                 isRegister ? TextInputAction.next : TextInputAction.done,
@@ -270,13 +255,10 @@ class _LoginPageState extends State<LoginPage> {
                             Row(
                               children: [
                                 Expanded(
-                                  child: TextField(
+                                  child: ZzzInput(
                                     controller: codeController,
-                                    style: const TextStyle(color: Color(0xffE0E0E0)),
-                                    decoration: inputDecoration.copyWith(
-                                      labelText: '邮箱验证码',
-                                      prefixIcon: const Icon(Icons.verified),
-                                    ),
+                                    hintText: '邮箱验证码',
+                                    prefixIcon: Icons.verified,
                                     keyboardType: TextInputType.number,
                                     textInputAction: TextInputAction.next,
                                   ),
@@ -301,13 +283,10 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 16),
                           ],
-                          TextField(
+                          ZzzInput(
                             controller: passwordController,
-                            style: const TextStyle(color: Color(0xffE0E0E0)),
-                            decoration: inputDecoration.copyWith(
-                              labelText: '密码',
-                              prefixIcon: const Icon(Icons.lock),
-                            ),
+                            hintText: '密码',
+                            prefixIcon: Icons.lock,
                             obscureText: true,
                             textInputAction:
                                 isRegister ? TextInputAction.next : TextInputAction.done,
@@ -315,13 +294,10 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           if (isRegister) ...[
                             const SizedBox(height: 16),
-                            TextField(
+                            ZzzInput(
                               controller: confirmPasswordController,
-                              style: const TextStyle(color: Color(0xffE0E0E0)),
-                              decoration: inputDecoration.copyWith(
-                                labelText: '确认密码',
-                                prefixIcon: const Icon(Icons.lock_outline),
-                              ),
+                              hintText: '确认密码',
+                              prefixIcon: Icons.lock_outline,
                               obscureText: true,
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) => _submit(),

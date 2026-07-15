@@ -36,6 +36,8 @@ class Controller extends GetxController {
   // （空字符串代表「全部」，不过滤）。
   final categories = <CategoryModel>[].obs;
   final selectedCategorySlug = ''.obs;
+  // 首页 feed 模式：recommend / following / favorites
+  final feedMode = 'recommend'.obs;
   // Persistent storage key for offline cache
   static const String _searchCacheKey = 'offline_search_cache';
   String? searchEndCur;
@@ -594,6 +596,10 @@ class Controller extends GetxController {
     debounce(
       searchQuery,
       (query) async {
+        if (query.isNotEmpty && feedMode.value != 'recommend') {
+          feedMode.value = 'recommend';
+          selectedCategorySlug.value = '';
+        }
         searchController.text = query;
         searchResult.clear();
         searchEndCur = null;
@@ -673,6 +679,7 @@ class Controller extends GetxController {
 
   Future<void> _checkNewPosts() async {
     if (searchQuery.isNotEmpty) return;
+    if (feedMode.value != 'recommend') return;
     // Don't check if we are currently searching/refreshing
     if (isSearching.value) return;
 
@@ -724,9 +731,14 @@ class Controller extends GetxController {
   Future<void> showNewPosts() async {
     // Only applies to default feed mode.
     if (searchQuery.isNotEmpty) {
+      if (feedMode.value != 'recommend') {
+        feedMode.value = 'recommend';
+        selectedCategorySlug.value = '';
+      }
       await refreshSearchData();
       return;
     }
+    if (feedMode.value != 'recommend') return;
 
     // Reset timer to avoid polling conflicts while inserting new items.
     _startNewPostCheck();
@@ -863,27 +875,54 @@ class Controller extends GetxController {
     }
   }
 
-  bool _isSwitchingCategory = false;
+  bool _isSwitchingFilter = false;
 
-  /// 切换当前频道过滤项并刷新首页。空 slug 代表「全部」。
-  /// 不走节流的 refreshSearchData——快速连点不同 tab 时，节流会丢弃后续刷新，
-  /// 导致 UI 高亮的分区与列表内容不一致。这里直接刷新并在拉取期间若 slug
-  /// 又变化则再刷一次，保证「最后一次点击」胜出。
-  Future<void> selectCategory(String slug) async {
-    if (selectedCategorySlug.value == slug) return;
-    selectedCategorySlug.value = slug;
+  /// 切换当前频道过滤项并刷新首页。空 slug 代表「最新」。
+  Future<void> selectCategory(String slug, {BuildContext? context}) async {
+    await selectFilter(category: slug, context: context);
+  }
 
-    // 已有切换在跑：仅更新目标 slug，正在运行的循环会重新拉取。
-    if (_isSwitchingCategory) return;
-    _isSwitchingCategory = true;
+  /// 切换 feed 模式（关注/收藏）并刷新首页。点击当前 feed 会切回推荐。
+  Future<void> selectFeed(String feed, {BuildContext? context}) async {
+    await selectFilter(feed: feed, context: context);
+  }
+
+  Future<void> selectFilter(
+      {String? category, String? feed, BuildContext? context}) async {
+    if (category != null) {
+      if (selectedCategorySlug.value == category &&
+          feedMode.value == 'recommend') {
+        return;
+      }
+      selectedCategorySlug.value = category;
+      feedMode.value = 'recommend';
+    }
+
+    if (feed != null) {
+      if (feedMode.value == feed && selectedCategorySlug.value == '') {
+        feedMode.value = 'recommend';
+        selectedCategorySlug.value = '';
+      } else {
+        if (!await ensureLogin(context: context)) return;
+        feedMode.value = feed;
+        selectedCategorySlug.value = '';
+      }
+    }
+
+    // 已有切换在跑：仅更新目标，正在运行的循环会重新拉取。
+    if (_isSwitchingFilter) return;
+    _isSwitchingFilter = true;
     try {
-      String target;
+      String targetCategory;
+      String targetFeed;
       do {
-        target = selectedCategorySlug.value;
+        targetCategory = selectedCategorySlug.value;
+        targetFeed = feedMode.value;
         await _reloadFeed();
-      } while (selectedCategorySlug.value != target);
+      } while (selectedCategorySlug.value != targetCategory ||
+          feedMode.value != targetFeed);
     } finally {
-      _isSwitchingCategory = false;
+      _isSwitchingFilter = false;
     }
   }
 
@@ -898,6 +937,7 @@ class Controller extends GetxController {
       searchQuery(),
       searchEndCur ?? '',
       categorySlug: selectedCategorySlug.value,
+      feed: feedMode.value,
     );
     // pagination returns PaginationModel<HDataModel>
     // destructure:
@@ -912,7 +952,8 @@ class Controller extends GetxController {
 
     // Save to offline cache if this is the first page of default search
     // （仅「全部」频道、无搜索词时写入，过滤态不污染通用缓存）。
-    if ((searchEndCur == null ||
+    if (feedMode.value == 'recommend' &&
+        (searchEndCur == null ||
             searchEndCur!.isEmpty ||
             searchEndCur == ApiConfig.defaultPageSize.toString()) &&
         searchQuery().isEmpty &&
@@ -950,12 +991,12 @@ class Controller extends GetxController {
     return null;
   }
 
-  Future<bool> ensureLogin() async {
+  Future<bool> ensureLogin({BuildContext? context}) async {
     if (isLogin.value) return true;
-    final context = Get.context;
-    if (context != null) {
+    final ctx = context ?? Get.overlayContext ?? Get.context;
+    if (ctx != null) {
       await showZZZDialog(
-        context: context,
+        context: ctx,
         pageBuilder: (context) => const LoginPage(),
       );
     }
@@ -970,7 +1011,7 @@ class Controller extends GetxController {
 
   /// 发帖/评论前调用。未登录先提示登录；未通过考试先提示并跳转到考试页。
   Future<bool> ensureExamPassed(BuildContext context) async {
-    if (!await ensureLogin()) return false;
+    if (!await ensureLogin(context: context)) return false;
     if (user.value?.examPassed == true) return true;
 
     final shouldGo = await showDialog<bool>(

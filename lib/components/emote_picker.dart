@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/controllers/emote_controller.dart';
 import 'package:inter_knot/models/emote.dart';
 
@@ -94,11 +95,11 @@ class _EmotePickerState extends State<EmotePicker> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (iconUrl != null)
-              Image.network(
-                iconUrl,
+              CachedImage(
+                url: iconUrl,
                 width: 20,
                 height: 20,
-                errorBuilder: (_, __, ___) => const Icon(Icons.image, size: 18),
+                errorBuilder: (_) => const Icon(Icons.image, size: 18),
               )
             else
               const Icon(Icons.tag, size: 18),
@@ -163,12 +164,12 @@ class _EmotePickerState extends State<EmotePicker> {
           onTap: () => Navigator.of(context).pop(emote.code),
           child: Padding(
             padding: const EdgeInsets.all(4),
-            child: Image.network(
-              emote.url,
+            child: CachedImage(
+              url: emote.url,
               width: 36,
               height: 36,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+              errorBuilder: (_) => const Icon(Icons.broken_image),
             ),
           ),
         );

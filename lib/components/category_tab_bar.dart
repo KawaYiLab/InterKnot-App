@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/controllers/data.dart';
 
-/// 首页频道/分区横向 tab。空 slug 代表「全部」。
-/// 数据源为 Controller.categories，选中态绑定 Controller.selectedCategorySlug。
+/// 首页频道/分区横向 tab。空 slug 代表「最新」。
+/// 数据源为 Controller.categories，选中态绑定 Controller.selectedCategorySlug
+/// 与 Controller.feedMode。
 class CategoryTabBar extends StatelessWidget {
   const CategoryTabBar({super.key});
 
@@ -13,31 +14,56 @@ class CategoryTabBar extends StatelessWidget {
 
     return Obx(() {
       final cats = c.categories;
-      // 频道尚未加载出来时不占位。
-      if (cats.isEmpty) return const SizedBox.shrink();
-
       final selected = c.selectedCategorySlug.value;
-      final items = <({String label, String slug})>[
-        (label: '全部', slug: ''),
-        ...cats.map((e) => (label: e.name, slug: e.slug)),
-      ];
+      final feed = c.feedMode.value;
+
+      final children = <Widget>[];
+      void addSep() => children.add(const SizedBox(width: 8));
+      void addChip(String label, bool isActive, VoidCallback onTap) {
+        children.add(_CategoryChip(
+          label: label,
+          isActive: isActive,
+          onTap: onTap,
+        ));
+      }
+
+      addChip(
+        '最新',
+        feed == 'recommend' && selected == '',
+        () => c.selectCategory('', context: context),
+      );
+      addSep();
+
+      for (final cat in cats) {
+        addChip(
+          cat.name,
+          feed == 'recommend' && selected == cat.slug,
+          () => c.selectCategory(cat.slug, context: context),
+        );
+        addSep();
+      }
+
+      children.add(Container(width: 1, height: 20, color: Colors.white24));
+      addSep();
+
+      addChip(
+        '关注',
+        feed == 'following',
+        () => c.selectFeed('following', context: context),
+      );
+      addSep();
+      addChip(
+        '收藏',
+        feed == 'favorites',
+        () => c.selectFeed('favorites', context: context),
+      );
 
       return SizedBox(
         height: 48,
-        child: ListView.separated(
+        child: ListView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          itemCount: items.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final item = items[index];
-            final isActive = item.slug == selected;
-            return _CategoryChip(
-              label: item.label,
-              isActive: isActive,
-              onTap: () => c.selectCategory(item.slug),
-            );
-          },
+          children: children,
         ),
       );
     });

@@ -1,11 +1,11 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/click_region.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
@@ -31,6 +31,8 @@ class ImageViewer extends StatefulWidget {
     int initialIndex = 0,
     String? heroTagPrefix,
   }) {
+    if (imageUrls.isEmpty) return;
+    final clampedIndex = initialIndex.clamp(0, imageUrls.length - 1);
     showZZZDialog(
       context: context,
       transitionDuration: const Duration(milliseconds: 260),
@@ -38,7 +40,7 @@ class ImageViewer extends StatefulWidget {
       pageBuilder: (context) => Center(
         child: ImageViewer(
           imageUrls: imageUrls,
-          initialIndex: initialIndex,
+          initialIndex: clampedIndex,
           heroTagPrefix: heroTagPrefix,
         ),
       ),
@@ -72,25 +74,24 @@ class _ImageViewerState extends State<ImageViewer>
   Ticker? _wheelTicker;
   Duration? _wheelLast;
   double _wheelVelocity = 0.0;
-  final Map<int, Size> _imageSizes = <int, Size>{};
-  final List<ImageStream> _imageStreams = <ImageStream>[];
-  final List<ImageStreamListener> _imageStreamListeners =
-      <ImageStreamListener>[];
+  final Map<String, ImageProvider> _imageProviders = {};
+  final Map<String, ImageProvider> _resizedImageProviders = {};
   late int _currentIndex;
   bool _showChrome = true;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    final length = widget.imageUrls.length;
+    _currentIndex = length > 0 ? widget.initialIndex.clamp(0, length - 1) : 0;
+    _pageController = PageController(initialPage: _currentIndex);
     _photoControllers = List<PhotoViewController>.generate(
-      widget.imageUrls.length,
+      length,
       (_) => PhotoViewController(),
     );
     _zoomControllers.addAll(
       List<AnimationController>.generate(
-        widget.imageUrls.length,
+        length,
         (_) => AnimationController(
           vsync: this,
           duration: const Duration(milliseconds: 160),
@@ -99,19 +100,15 @@ class _ImageViewerState extends State<ImageViewer>
     );
     _zoomAnimations.addAll(
       List<Animation<double>>.generate(
-        widget.imageUrls.length,
+        length,
         (_) => const AlwaysStoppedAnimation<double>(1),
       ),
     );
-    _resolveImageSizes();
     _wheelTicker = createTicker(_onWheelTick);
   }
 
   @override
   void dispose() {
-    for (var i = 0; i < _imageStreams.length; i += 1) {
-      _imageStreams[i].removeListener(_imageStreamListeners[i]);
-    }
     for (final controller in _zoomControllers) {
       controller.dispose();
     }
@@ -164,44 +161,24 @@ class _ImageViewerState extends State<ImageViewer>
     _wheelVelocity *= math.exp(-k * dtSeconds);
   }
 
-  void _resolveImageSizes() {
-    for (var i = 0; i < widget.imageUrls.length; i += 1) {
-      final provider = _buildImageProvider(widget.imageUrls[i]);
-      final stream = provider.resolve(const ImageConfiguration());
-      final listener = ImageStreamListener((info, _) {
-        final size = Size(
-          info.image.width.toDouble(),
-          info.image.height.toDouble(),
-        );
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _imageSizes[i] = size;
-        });
-      });
-      stream.addListener(listener);
-      _imageStreams.add(stream);
-      _imageStreamListeners.add(listener);
-    }
-  }
+  ImageProvider _getImageProvider(String url) =>
+      _imageProviders.putIfAbsent(url, () => createNetworkImageProvider(url));
 
-  bool _isGifUrl(String url) {
-    final trimmed = url.trim();
-    if (trimmed.isEmpty) {
-      return false;
-    }
-    final uri = Uri.tryParse(trimmed);
-    final path = (uri?.path ?? trimmed).toLowerCase();
-    return path.endsWith('.gif');
-  }
-
-  ImageProvider _buildImageProvider(String url) {
-    if (_isGifUrl(url)) {
-      return NetworkImage(url);
-    }
-    return CachedNetworkImageProvider(url);
-  }
+  ImageProvider _getResizedImageProvider(String url) =>
+      _resizedImageProviders.putIfAbsent(
+        url,
+        () {
+          final provider = _getImageProvider(url);
+          if (provider is SingleFrameNetworkImageProvider) return provider;
+          return ResizeImage(
+            provider,
+            width: maxCacheDimension,
+            height: maxCacheDimension,
+            policy: ResizeImagePolicy.fit,
+            allowUpscaling: true,
+          );
+        },
+      );
 
   void _onPageChanged(int index) {
     setState(() {
@@ -230,13 +207,12 @@ class _ImageViewerState extends State<ImageViewer>
   }
 
   ({double minScale, double maxScale})? _scaleBoundsForCurrent() {
-    final imageSize = _imageSizes[_currentIndex];
-    if (imageSize == null) {
-      return null;
-    }
     final viewport = MediaQuery.of(context).size;
-    final minScale = _calculateContainedScale(viewport, imageSize);
-    final maxScale = _calculateCoveredScale(viewport, imageSize) * 2;
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final side = maxCacheDimension / dpr;
+    final childSize = Size(side, side);
+    final minScale = _calculateContainedScale(viewport, childSize);
+    final maxScale = _calculateCoveredScale(viewport, childSize) * 2;
     return (minScale: minScale, maxScale: maxScale);
   }
 
@@ -292,16 +268,20 @@ class _ImageViewerState extends State<ImageViewer>
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image(
-          image: _buildImageProvider(url),
-          fit: BoxFit.cover,
-          gaplessPlayback: true,
-          filterQuality: FilterQuality.low,
+        Positioned.fill(
+          child: CachedImage(
+            imageProvider: _getImageProvider(url),
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.low,
+          ),
         ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
-          child: Container(
-            color: Colors.black.withValues(alpha: 0.55),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.55),
+            ),
           ),
         ),
       ],
@@ -511,10 +491,47 @@ class _ImageViewerState extends State<ImageViewer>
                                                       null
                                                   ? '${widget.heroTagPrefix}-$index'
                                                   : url;
+                                              final dpr = MediaQuery
+                                                  .devicePixelRatioOf(context);
+                                              final side =
+                                                  maxCacheDimension / dpr;
 
-                                              return PhotoViewGalleryPageOptions(
-                                                imageProvider:
-                                                    _buildImageProvider(url),
+                                              return PhotoViewGalleryPageOptions
+                                                  .customChild(
+                                                child: Image(
+                                                  image: _getResizedImageProvider(
+                                                      url),
+                                                  width: side,
+                                                  height: side,
+                                                  fit: BoxFit.contain,
+                                                  filterQuality:
+                                                      FilterQuality.high,
+                                                  gaplessPlayback: true,
+                                                  loadingBuilder: (context,
+                                                          child,
+                                                          progress) =>
+                                                      progress == null
+                                                          ? child
+                                                          : const Center(
+                                                              child: SizedBox(
+                                                                width: 20,
+                                                                height: 20,
+                                                                child: CircularProgressIndicator(
+                                                                  strokeWidth: 2,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                  errorBuilder: (context,
+                                                          error,
+                                                          stackTrace) =>
+                                                      const Center(
+                                                    child: Icon(
+                                                      Icons.broken_image,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                                childSize: Size(side, side),
                                                 initialScale:
                                                     PhotoViewComputedScale
                                                         .contained,
@@ -530,33 +547,9 @@ class _ImageViewerState extends State<ImageViewer>
                                                         tag: heroTag),
                                                 controller:
                                                     _photoControllers[index],
-                                                errorBuilder: (context, error,
-                                                    stackTrace) {
-                                                  return const Center(
-                                                    child: Icon(
-                                                      Icons.broken_image,
-                                                      color: Colors.white,
-                                                    ),
-                                                  );
-                                                },
                                               );
                                             },
                                             itemCount: widget.imageUrls.length,
-                                            loadingBuilder: (context, event) =>
-                                                Center(
-                                              child: SizedBox(
-                                                width: 20.0,
-                                                height: 20.0,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  value: event == null
-                                                      ? 0
-                                                      : event.cumulativeBytesLoaded /
-                                                          (event.expectedTotalBytes ??
-                                                              1),
-                                                ),
-                                              ),
-                                            ),
                                             backgroundDecoration:
                                                 const BoxDecoration(
                                                     color: Colors.transparent),

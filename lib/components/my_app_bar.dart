@@ -6,6 +6,7 @@ import 'package:inter_knot/components/my_tab.dart';
 import 'package:inter_knot/components/search_field.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
 import 'package:inter_knot/pages/message_center_page.dart';
+import 'package:inter_knot/pages/profile_page.dart';
 import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/constants/globals.dart';
 import 'package:inter_knot/controllers/messaging_controller.dart';
@@ -64,10 +65,31 @@ class _MyAppBarState extends State<MyAppBar> {
                     if (isCompact)
                       Obx(() {
                         final user = c.user.value;
-                        return Avatar(
-                          user?.avatar,
-                          size: 36,
-                          onTap: () => c.animateToPage(1, animate: false),
+                        if (c.isLogin.value) {
+                          return Avatar(
+                            user?.avatar,
+                            size: 38,
+                            onTap: () {
+                              final authorId = c.authorId.value ??
+                                  user?.authorId;
+                              if (authorId != null && authorId.isNotEmpty) {
+                                navigateWithSlideTransition(
+                                  context,
+                                  ProfilePage(authorDocumentId: authorId),
+                                  routeName: '/profile/me',
+                                );
+                              }
+                            },
+                          );
+                        }
+                        return GestureDetector(
+                          onTap: () => c.animateToPage(0, animate: false),
+                          child: Image.asset(
+                            'assets/images/zzzicon.png',
+                            width: 38,
+                            height: 38,
+                            filterQuality: FilterQuality.medium,
+                          ),
                         );
                       })
                     else
@@ -145,7 +167,8 @@ class _MyAppBarState extends State<MyAppBar> {
                                     middle: true,
                                     isSelected: c.selectedIndex.value == 2,
                                     onTap: () async {
-                                      if (await c.ensureLogin()) {
+                                      if (await c.ensureLogin(
+                                          context: context)) {
                                         c.animateToPage(2, animate: false);
                                       }
                                     },
@@ -207,9 +230,9 @@ class _MyAppBarState extends State<MyAppBar> {
                           clipBehavior: Clip.none,
                           children: [
                             const Icon(
-                              Icons.notifications_outlined,
+                              Icons.notifications,
                               color: Colors.white,
-                              size: 24,
+                              size: 26,
                             ),
                             if (c.unreadNotificationCount.value > 0)
                               Positioned(
@@ -246,7 +269,7 @@ class _MyAppBarState extends State<MyAppBar> {
                           ],
                         ),
                         onPressed: () async {
-                          if (await c.ensureLogin()) {
+                          if (await c.ensureLogin(context: context)) {
                             if (!context.mounted) return;
                             // 移动端：使用平滑的页面过渡动画
                             await navigateWithSlideTransition(

@@ -1,5 +1,5 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
 
 class Avatar extends StatelessWidget {
@@ -25,19 +25,15 @@ class Avatar extends StatelessWidget {
               width: size,
               fit: BoxFit.cover,
             )
-          : CachedNetworkImage(
-              imageUrl: src!.trim(),
+          : CachedImage(
+              url: src!.trim(),
               width: size,
               height: size,
+              cacheWidth: cacheSize,
+              cacheHeight: cacheSize,
               fit: BoxFit.cover,
-              memCacheWidth: cacheSize,
-              memCacheHeight: cacheSize,
-              maxWidthDiskCache: cacheSize,
-              maxHeightDiskCache: cacheSize,
               fadeInDuration: Duration.zero,
-              fadeOutDuration: Duration.zero,
-              errorWidget: (context, url, error) =>
-                  Assets.images.profilePhoto.image(
+              errorBuilder: (_) => Assets.images.profilePhoto.image(
                 height: size,
                 width: size,
                 fit: BoxFit.cover,

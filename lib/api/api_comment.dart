@@ -99,6 +99,7 @@ extension CommentApi on Api {
     String? authorId,
     String? parentId,
     List<String>? imageIds,
+    bool? isAnonymous,
   }) {
     if (discussionId.isEmpty) {
       throw ApiException('帖子ID不能为空');
@@ -113,6 +114,7 @@ extension CommentApi on Api {
       if (authorId != null && authorId.isNotEmpty) 'author': authorId,
       if (parentId != null && parentId.isNotEmpty) 'parent': parentId,
       if (imageIds != null && imageIds.isNotEmpty) 'images': imageIds,
+      if (isAnonymous == true) 'isAnonymous': true,
     };
 
     return post(

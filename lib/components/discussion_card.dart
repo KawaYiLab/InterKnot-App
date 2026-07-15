@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/components/avatar.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/hover_3d.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/gen/assets.gen.dart';
@@ -58,37 +58,17 @@ class NetworkImageBox extends StatelessWidget {
       return errorBuilder(context);
     }
 
-    final isGif = src.toLowerCase().contains('.gif');
-    if (isGif) {
-      return Image.network(
-        src,
-        fit: fit,
-        alignment: alignment,
-        filterQuality: filterQuality,
-        gaplessPlayback: gaplessPlayback,
-        cacheWidth: memCacheWidth,
-        cacheHeight: memCacheHeight,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          final value = progress.expectedTotalBytes != null
-              ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-              : null;
-          return loadingBuilder(context, value);
-        },
-        errorBuilder: (context, error, stackTrace) => errorBuilder(context),
-      );
-    }
-    return CachedNetworkImage(
-      imageUrl: src,
+    return CachedImage(
+      url: src,
       fit: fit,
       alignment: alignment,
       filterQuality: filterQuality,
-      memCacheWidth: memCacheWidth,
-      memCacheHeight: memCacheHeight,
-      placeholder: (context, url) => loadingBuilder(context, null),
+      gaplessPlayback: gaplessPlayback,
+      cacheWidth: memCacheWidth,
+      cacheHeight: memCacheHeight,
       fadeInDuration: fadeInDuration ?? const Duration(milliseconds: 500),
-      fadeOutDuration: fadeOutDuration ?? const Duration(milliseconds: 1000),
-      errorWidget: (context, url, error) => errorBuilder(context),
+      loadingBuilder: loadingBuilder,
+      errorBuilder: errorBuilder,
     );
   }
 }

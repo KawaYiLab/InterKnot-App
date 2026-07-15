@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
-import 'package:inter_knot/components/avatar.dart';
 import 'package:inter_knot/api/api_exception.dart';
+import 'package:inter_knot/components/avatar.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/discussions_grid.dart';
 import 'package:inter_knot/components/report_sheet.dart';
 import 'package:inter_knot/controllers/data.dart';
+import 'package:inter_knot/controllers/messaging_controller.dart';
+import 'package:inter_knot/helpers/copy_text.dart';
 import 'package:inter_knot/helpers/dialog_helper.dart';
-import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/helpers/logger.dart';
 import 'package:inter_knot/helpers/share_helper.dart';
-import 'package:inter_knot/helpers/time_formatter.dart';
+import 'package:inter_knot/helpers/toast.dart';
+import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
+import 'package:inter_knot/models/discussion.dart';
 import 'package:inter_knot/models/h_data.dart';
 import 'package:inter_knot/pages/discussion_page.dart';
+import 'package:inter_knot/pages/dm_chat_page.dart';
+import 'package:inter_knot/pages/profile_settings_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -26,52 +33,41 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage>
-    with SingleTickerProviderStateMixin {
+class _ProfilePageState extends State<ProfilePage> {
   final _api = Get.find<Api>();
   final _c = Get.find<Controller>();
-  late TabController _tabController;
 
   Map<String, dynamic>? _profile;
   bool _isLoading = true;
   String? _error;
 
   final RxSet<HDataModel> _articles = <HDataModel>{}.obs;
-  final List<Map<String, dynamic>> _comments = [];
   String _articlesEndCursor = '0';
-  String _commentsEndCursor = '0';
   bool _hasMoreArticles = true;
-  bool _hasMoreComments = true;
   bool _isLoadingArticles = false;
-  bool _isLoadingComments = false;
+
   bool _isFollowingLoading = false;
+  bool _dmStarting = false;
+  bool _checkInLoading = false;
+
+  final _checkInStatus = <String, dynamic>{
+    'canCheckIn': false,
+    'totalDays': 0,
+    'consecutiveDays': 0,
+    'rank': 0,
+  };
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChanged);
     _loadProfile();
   }
 
-  @override
-  void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      if (_tabController.index == 0 && _articles.isEmpty) {
-        _loadArticles();
-      } else if (_tabController.index == 1 && _comments.isEmpty) {
-        _loadComments();
-      }
-    }
-  }
-
   Future<void> _loadProfile() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final profile = await _api.getProfile(widget.authorDocumentId);
       if (mounted) {
@@ -79,13 +75,16 @@ class _ProfilePageState extends State<ProfilePage>
           _profile = profile;
           _isLoading = false;
         });
-        _loadArticles();
+      }
+      await _loadArticles();
+      if (_isSelf) {
+        await _loadCheckInStatus();
       }
     } catch (e) {
       logger.e('Failed to load profile', error: e);
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = e is ApiException ? e.message : e.toString();
           _isLoading = false;
         });
       }
@@ -93,12 +92,11 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Future<void> _loadArticles() async {
-    if (_isLoadingArticles || !_hasMoreArticles) return;
+    if (_isLoadingArticles || !_hasMoreArticles || _isHidden) return;
 
     setState(() => _isLoadingArticles = true);
 
     try {
-      // Prepare author data from profile
       Map<String, dynamic>? authorData;
       if (_profile != null) {
         authorData = {
@@ -127,44 +125,78 @@ class _ProfilePageState extends State<ProfilePage>
     } catch (e) {
       logger.e('Failed to load articles', error: e);
       if (mounted) {
-        setState(() => _isLoadingArticles = false);
+        setState(() {
+          _isLoadingArticles = false;
+          _hasMoreArticles = false;
+        });
       }
     }
   }
 
-  Future<void> _loadComments() async {
-    if (_isLoadingComments || !_hasMoreComments) return;
-
-    setState(() => _isLoadingComments = true);
-
+  Future<void> _loadCheckInStatus() async {
     try {
-      final result = await _api.getProfileComments(
-        widget.authorDocumentId,
-        _commentsEndCursor,
-      );
-
+      final status = await _api.getCheckInStatus();
       if (mounted) {
         setState(() {
-          _comments.addAll(result.nodes);
-          _commentsEndCursor = result.endCursor ?? _commentsEndCursor;
-          _hasMoreComments = result.hasNextPage;
-          _isLoadingComments = false;
+          _checkInStatus['canCheckIn'] = status.canCheckIn;
+          _checkInStatus['totalDays'] = status.totalDays;
+          _checkInStatus['consecutiveDays'] = status.consecutiveDays;
+          _checkInStatus['rank'] = status.rank;
         });
       }
     } catch (e) {
-      logger.e('Failed to load comments', error: e);
+      // Silent: check-in status is optional.
+    }
+  }
+
+  Future<void> _doCheckIn() async {
+    if (!(_checkInStatus['canCheckIn'] as bool? ?? false) || _checkInLoading) {
+      return;
+    }
+
+    setState(() => _checkInLoading = true);
+    try {
+      final result = await _api.checkIn();
       if (mounted) {
-        setState(() => _isLoadingComments = false);
+        setState(() {
+          _checkInStatus['canCheckIn'] = false;
+          _checkInStatus['totalDays'] = result.totalDays;
+          _checkInStatus['consecutiveDays'] = result.consecutiveDays;
+          _checkInStatus['rank'] = result.rank;
+        });
       }
+
+      final user = _c.user.value;
+      if (user != null) {
+        if (result.currentExp != null) user.exp = result.currentExp;
+        if (result.currentLevel != null) user.level = result.currentLevel;
+        if (result.currentDenny != null) user.denny = result.currentDenny;
+        user.lastCheckInDate = DateTime.now().toIso8601String();
+        user.canCheckIn = false;
+        _c.user.refresh();
+      }
+
+      final dennyAdded = result.dennyAdded ?? 10;
+      final reward = result.reward ?? 0;
+      final rank = result.rank ?? 0;
+      final totalDays = result.totalDays ?? 0;
+      final rewardParts = <String>['丁尼+$dennyAdded'];
+      if (reward > 0) rewardParts.add('绳网信用+$reward');
+      final rankText = rank > 0 ? '，今日第${rank}名' : '';
+      final daysText = totalDays > 0 ? '，累计${totalDays}天' : '';
+
+      showToast('签到成功！${rewardParts.join('，')}$daysText$rankText');
+    } catch (e) {
+      showToast(e is ApiException ? e.message : '签到失败', isError: true);
+    } finally {
+      if (mounted) setState(() => _checkInLoading = false);
     }
   }
 
   Future<void> _toggleFollow() async {
-    if (_profile == null) return;
-    final isSelf = _profile!['isSelf'] == true;
-    if (isSelf) return;
+    if (_profile == null || _isSelf || _isHidden) return;
 
-    if (!await _c.ensureLogin()) return;
+    if (!await _c.ensureLogin(context: context)) return;
 
     final documentId = _profile!['documentId']?.toString() ?? '';
     if (documentId.isEmpty) return;
@@ -186,16 +218,35 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
+  Future<void> _startDm() async {
+    if (_profile == null || _isSelf || _isHidden || _uid == null) return;
+
+    if (!await _c.ensureLogin(context: context)) return;
+
+    final messaging = Get.find<MessagingController>();
+    setState(() => _dmStarting = true);
+    try {
+      await messaging.openDirectChat(_uid!);
+      if (mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DmChatPage()),
+        );
+      }
+    } catch (e) {
+      showToast(e is ApiException ? e.message : '无法发起私聊', isError: true);
+    } finally {
+      if (mounted) setState(() => _dmStarting = false);
+    }
+  }
+
   Future<void> _shareProfile() async {
     await ShareHelper.shareProfile(widget.authorDocumentId);
   }
 
   Future<void> _reportUser() async {
-    if (_profile == null) return;
-    final isSelf = _profile!['isSelf'] == true;
-    if (isSelf) return;
+    if (_profile == null || _isSelf || _isHidden) return;
 
-    if (!await _c.ensureLogin()) return;
+    if (!await _c.ensureLogin(context: context)) return;
 
     final userId = _profile!['userId']?.toString() ?? '';
     if (userId.isEmpty) return;
@@ -209,582 +260,146 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  Widget _buildProfileHeader() {
-    if (_profile == null) return const SizedBox.shrink();
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ProfileSettingsPage()),
+    );
+  }
 
-    final name = _profile!['name'] as String? ?? 'Unknown';
-    final bio = _profile!['bio'] as List?;
-    final avatar = _profile!['avatar'] as Map?;
-    final user = _profile!['user'] as Map?;
-    final stats = _profile!['stats'] as Map?;
+  void _openAvatarSettings() => _openSettings();
+  void _openCardSettings() => _openSettings();
 
-    final avatarUrl = avatar?['url'] as String?;
-    final level = user?['level'] as int? ?? 1;
-    final exp = user?['exp'] as int? ?? 0;
+  void _copyUid() {
+    if (_uid == null) return;
+    copyText(_uid.toString(), msg: 'UID 已复制');
+  }
 
-    final totalViews = stats?['totalViews'] as int? ?? 0;
-    final totalComments = stats?['totalComments'] as int? ?? 0;
-    final totalLikes = stats?['totalLikes'] as int? ?? 0;
-    final followersCount = _profile!['followersCount'] as int? ?? 0;
-    final followingCount = _profile!['followingCount'] as int? ?? 0;
-    final isSelf = _profile!['isSelf'] == true;
-    final isFollowing = _profile!['isFollowing'] == true;
-    final isHidden = _profile!['isHidden'] == true;
-
-    String bioText = '';
-    if (bio != null && bio.isNotEmpty) {
-      for (final block in bio) {
-        if (block is Map && block['type'] == 'paragraph') {
-          final children = block['children'] as List?;
-          if (children != null) {
-            for (final child in children) {
-              if (child is Map && child['type'] == 'text') {
-                bioText += child['text'] as String? ?? '';
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: const Color(0xff1E1E1E),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Avatar(avatarUrl, size: 80),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xffD7FF00),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Lv.$level',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'EXP: $exp',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xffD7FF00),
-                      ),
-                    ),
-                    if (bioText.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        bioText,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xffB0B0B0),
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          const Divider(color: Color(0xff404040)),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatItem('浏览', totalViews),
-              _buildStatItem('收到评论', totalComments),
-              _buildStatItem('点赞', totalLikes),
-              _buildStatItem('关注', followingCount),
-              _buildStatItem('粉丝', followersCount),
-            ],
-          ),
-          if (!isSelf && !isHidden) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isFollowingLoading ? null : _toggleFollow,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isFollowing
-                          ? const Color(0xff2A2A2A)
-                          : const Color(0xffD7FF00),
-                      foregroundColor:
-                          isFollowing ? Colors.grey : Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: _isFollowingLoading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(isFollowing ? '已关注' : '关注'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _reportUser,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey,
-                      side: const BorderSide(color: Color(0xff404040)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: const Text('举报'),
-                  ),
-                ),
-              ],
+  void _showCheckInHelp() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xff1a1a1a),
+        title: const Text('签到说明', style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('累计签到：${_checkInStatus['totalDays']} 天',
+                style: const TextStyle(color: Colors.white70)),
+            Text('连续签到：${_checkInStatus['consecutiveDays']} 天',
+                style: const TextStyle(color: Colors.white70)),
+            Text('今日排名：${_checkInStatus['rank'] ?? 0}',
+                style: const TextStyle(color: Colors.white70)),
+            Text(
+              '今日${_checkInStatus['canCheckIn'] == true ? '可' : '已'}签到',
+              style: const TextStyle(color: Colors.white70),
             ),
           ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了',
+                style: TextStyle(color: Color(0xffD7FF00))),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(String label, int value) {
-    return Column(
-      children: [
-        Text(
-          value.toString(),
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xff808080),
-          ),
-        ),
-      ],
-    );
+  // ── Helpers ─────────────────────────────────────────────────────
+
+  bool get _isSelf => _profile?['isSelf'] == true;
+  bool get _isHidden => _profile?['isHidden'] == true;
+  bool get _profileHidden => _profile?['profileHidden'] == true;
+  bool get _isFollowing => _profile?['isFollowing'] == true;
+
+  int? get _uid {
+    final raw = _profile?['userId'] ?? _profile?['uid'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
   }
 
-  Widget _buildMobileTabBar() {
-    final stats = _profile?['stats'] as Map?;
-    final articleCount = stats?['articleCount'] as int? ?? 0;
-    final commentCount = stats?['commentCount'] as int? ?? 0;
+  String get _name =>
+      (_profile?['name'] ?? _profile?['login'] ?? '匿名用户').toString();
 
-    return TabBar(
-      controller: _tabController,
-      indicatorColor: const Color(0xffD7FF00),
-      labelColor: const Color(0xffD7FF00),
-      unselectedLabelColor: const Color(0xff808080),
-      tabs: [
-        Tab(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              const Text('文章'),
-              const SizedBox(width: 8),
-              Text(
-                articleCount.toString(),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        Tab(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              const Text('评论'),
-              const SizedBox(width: 8),
-              Text(
-                commentCount.toString(),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  int get _level {
+    final user = _profile?['user'] as Map?;
+    final raw = user?['level'] ?? _profile?['level'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return 1;
   }
 
-  Widget _buildArticlesList() {
-    return DiscussionGrid(
-      list: _articles,
-      hasNextPage: _hasMoreArticles,
-      fetchData: _loadArticles,
-      reorderHistoryOnOpen: false,
-    );
+  String get _bioText => AuthorModel.extractBioText(_profile?['bio']) ?? '';
+
+  String? get _avatarUrl {
+    final equipped =
+        AuthorModel.extractAvatarUrl(_profile?['equippedAvatar']?['image']);
+    if (equipped != null && equipped.isNotEmpty) return equipped;
+    return AuthorModel.extractAvatarUrl(_profile?['avatar']);
   }
 
-  Widget _buildCommentsList() {
-    if (_comments.isEmpty && _isLoadingComments) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Image.asset(
-            'assets/images/Bangboo.gif',
-            width: 80,
-            height: 80,
-          ),
-        ),
-      );
+  String? get _bannerImageUrl {
+    return AuthorModel.extractAvatarUrl(_profile?['equippedCard']?['image']);
+  }
+
+  Map<String, dynamic>? get _stats =>
+      _profile?['stats'] as Map<String, dynamic>?;
+
+  int _stat(String key) {
+    final value = _stats?[key];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  int get _followersCount {
+    final value = _profile?['followersCount'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  int get _followingCount {
+    final value = _profile?['followingCount'];
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  String _formatNumber(int n) {
+    if (n >= 10000) {
+      return '${(n / 10000).toStringAsFixed(1)}万';
     }
-
-    if (_comments.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
-            '暂无评论',
-            style: TextStyle(color: Color(0xff808080)),
-          ),
-        ),
-      );
+    if (n >= 1000) {
+      return '${(n / 1000).toStringAsFixed(1)}k';
     }
+    return n.toString();
+  }
 
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollEndNotification &&
-            notification.metrics.extentAfter < 200) {
-          _loadComments();
-        }
-        return false;
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _comments.length + (_hasMoreComments ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index == _comments.length) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Image.asset(
-                  'assets/images/Bangboo.gif',
-                  width: 80,
-                  height: 80,
-                ),
-              ),
-            );
-          }
-
-          final comment = _comments[index];
-          return _buildCommentCard(comment);
-        },
+  Future<void> _openArticle(HDataModel item, DiscussionModel discussion) async {
+    await showZZZDialog(
+      context: context,
+      pageBuilder: (context) => DiscussionPage(
+        discussion: discussion,
+        hData: item,
+        reorderHistoryOnOpen: false,
       ),
     );
   }
 
-  Widget _buildCommentCard(Map<String, dynamic> comment) {
-    final content = comment['content'] as String? ?? '';
-    final createdAt = comment['createdAt'] as String?;
-    final likesCount = comment['likescount'] as int? ?? 0;
-    final liked = comment['liked'] as bool? ?? false;
-    final article = comment['article'] as Map?;
-    final parent = comment['parent'] as Map?;
-
-    final articleTitle = article?['title'] as String? ?? '';
-    final articleDocumentId = article?['documentId'] as String?;
-
-    DateTime? createdDate;
-    if (createdAt != null) {
-      createdDate = DateTime.tryParse(createdAt);
-    }
-
-    return Card(
-      color: const Color(0xff1E1E1E),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: () async {
-          if (articleDocumentId != null) {
-            try {
-              final discussion = await _api.getDiscussion(articleDocumentId);
-              final hData = HDataModel(
-                id: articleDocumentId,
-                updatedAt: createdDate,
-                createdAt: createdDate,
-                isPinned: false,
-              );
-              await showZZZDialog(
-                context: context,
-                pageBuilder: (context) => DiscussionPage(
-                  discussion: discussion,
-                  hData: hData,
-                  reorderHistoryOnOpen: false,
-                ),
-              );
-            } catch (e) {
-              logger.e('Failed to load discussion', error: e);
-            }
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (parent != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xff2A2A2A),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            '回复 ',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xff808080),
-                            ),
-                          ),
-                          Text(
-                            parent['author']?['name'] as String? ?? 'Unknown',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xffD7FF00),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        parent['content'] as String? ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xffB0B0B0),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              SelectionArea(
-                child: Text(
-                  content,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xffE0E0E0),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (createdDate != null)
-                    Text(
-                      formatRelativeTime(
-                        createdDate,
-                        fallbackPattern: 'yyyy-MM-dd HH:mm',
-                      ),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xff808080),
-                      ),
-                    ),
-                  const Spacer(),
-                  Icon(
-                    liked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                    size: 14,
-                    color: liked ? const Color(0xffD7FF00) : Colors.grey,
-                  ),
-                  if (likesCount > 0) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      likesCount.toString(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: liked ? const Color(0xffD7FF00) : Colors.grey,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              if (articleTitle.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                const Divider(color: Color(0xff404040)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.article_outlined,
-                      size: 16,
-                      color: Color(0xff808080),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        articleTitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xff808080),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  // ── Build ─────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 800;
-
-    // 桌面端使用对话框样式，移动端使用全屏页面
-    if (isDesktop) {
-      return _buildDesktopDialog();
-    }
-
-    return _buildMobileLayout();
-  }
-
-  Widget _buildDesktopDialog() {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 半透明背景
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Get.back(),
-              child: Container(
-                color: Colors.black.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-          // 内容区域
-          Center(
-            child: GestureDetector(
-              onTap: () {}, // 阻止点击穿透
-              child: Container(
-                constraints:
-                    const BoxConstraints(maxWidth: 1200, maxHeight: 900),
-                margin: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: AssetImage('assets/images/pc-page-bg.png'),
-                    fit: BoxFit.cover,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Scaffold(
-                    backgroundColor: Colors.transparent,
-                    body: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        children: [
-                          _buildDesktopHeader(),
-                          const SizedBox(height: 24),
-                          Expanded(
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: _buildDesktopContentBox(),
-                                ),
-                                const SizedBox(width: 24),
-                                Expanded(
-                                  flex: 1,
-                                  child: _buildDesktopStatsBox(),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileLayout() {
     return Scaffold(
       backgroundColor: const Color(0xff121212),
-      appBar: AppBar(
-        backgroundColor: const Color(0xff1E1E1E),
-        title: const Text('个人主页'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Get.back(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.white70),
-            onPressed: _shareProfile,
-          ),
-        ],
-      ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xffD7FF00)))
           : _error != null
               ? Center(
                   child: Padding(
@@ -792,270 +407,57 @@ class _ProfilePageState extends State<ProfilePage>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: Colors.red,
-                        ),
+                        const Icon(Icons.error_outline,
+                            size: 64, color: Colors.red),
                         const SizedBox(height: 16),
-                        const Text(
-                          '加载失败',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
                         Text(
                           _error!,
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xff808080),
-                          ),
+                              fontSize: 14, color: Color(0xff808080)),
                           textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: _loadProfile,
+                          child: const Text('重试'),
                         ),
                       ],
                     ),
                   ),
                 )
-              : Column(
-                  children: [
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: _buildProfileHeader(),
-                    ),
-                    Container(
-                      color: const Color(0xff1E1E1E),
-                      child: _buildMobileTabBar(),
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildArticlesList(),
-                          _buildCommentsList(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              : _buildBody(),
     );
   }
 
-  Widget _buildDesktopHeader() {
-    if (_isLoading) {
-      return Card(
-        color: const Color(0xff1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 2,
-          ),
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
+  Widget _buildBody() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final isCompact = width < 640;
+        final isDesktop = width >= 1024;
+        final showBottomActions = isDesktop && _isSelf;
 
-    if (_error != null || _profile == null) {
-      return Card(
-        color: const Color(0xff1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 2,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Text(
-              _error ?? '加载失败',
-              style: const TextStyle(color: Colors.red),
-            ),
-          ),
-        ),
-      );
-    }
-
-    final name = _profile!['name'] as String? ?? 'Unknown';
-    final bio = _profile!['bio'] as List?;
-    final avatar = _profile!['avatar'] as Map?;
-    final user = _profile!['user'] as Map?;
-
-    final avatarUrl = avatar?['url'] as String?;
-    final level = user?['level'] as int? ?? 1;
-    final exp = user?['exp'] as int? ?? 0;
-
-    String bioText = '';
-    if (bio != null && bio.isNotEmpty) {
-      for (final block in bio) {
-        if (block is Map && block['type'] == 'paragraph') {
-          final children = block['children'] as List?;
-          if (children != null) {
-            for (final child in children) {
-              if (child is Map && child['type'] == 'text') {
-                bioText += child['text'] as String? ?? '';
-              }
-            }
-          }
-        }
-      }
-    }
-
-    return Card(
-      color: const Color(0xff1E1E1E),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 2,
-        ),
-      ),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xffD7FF00).withValues(alpha: 0.5),
-                  width: 4,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Avatar(avatarUrl, size: 100),
-              ),
-            ),
-            const SizedBox(width: 24),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xffD7FF00),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Lv.$level',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'EXP: $exp',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xffD7FF00),
-                    ),
-                  ),
-                  if (bioText.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      bioText,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[400],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.share, color: Colors.grey),
-              onPressed: _shareProfile,
-            ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.grey),
-              onPressed: () => Get.back(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDesktopContentBox() {
-    return Card(
-      color: const Color(0xff1E1E1E),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _buildDesktopTabBar(),
-          ),
-          const Divider(height: 1, color: Color(0xff333333)),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildArticlesList(),
-                _buildCommentsList(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDesktopTabBar() {
-    final stats = _profile?['stats'] as Map?;
-    final articleCount = stats?['articleCount'] as int? ?? 0;
-    final commentCount = stats?['commentCount'] as int? ?? 0;
-
-    return AnimatedBuilder(
-      animation: _tabController,
-      builder: (context, child) {
-        final selectedIndex = _tabController.index;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        return SafeArea(
+          bottom: false,
+          child: Column(
             children: [
-              _buildDesktopTabItem('文章', articleCount, 0, selectedIndex == 0),
-              _buildDesktopTabItem('评论', commentCount, 1, selectedIndex == 1),
+              _buildTopActionsRow(),
+              Expanded(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1600),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isCompact ? 16 : 24,
+                        vertical: isCompact ? 12 : 24,
+                      ),
+                      child: isCompact
+                          ? _buildCompactContent()
+                          : _buildDesktopContent(showBottomActions),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -1063,140 +465,707 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  Widget _buildDesktopTabItem(
-      String text, int count, int index, bool isSelected) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: () => _tabController.animateTo(index),
-          child: SizedBox(
-            height: 40,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (isSelected)
-                  Positioned.fill(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xffD7FF00),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        text,
-                        style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        count.toString(),
-                        style: TextStyle(
-                          color: isSelected
-                              ? Colors.black.withValues(alpha: 0.6)
-                              : const Color(0xff808080),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+  Widget _buildTopActionsRow() {
+    final canPop = Navigator.of(context).canPop();
+    final isDialog = ModalRoute.of(context)?.barrierColor != null;
+    final backButton = canPop
+        ? IconButton(
+            icon: Icon(
+              isDialog ? Icons.close : Icons.arrow_back,
+              color: Colors.white70,
             ),
+            onPressed: () => Navigator.of(context).maybePop(),
+          )
+        : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          if (!isDialog && backButton != null) backButton,
+          const Spacer(),
+          if (!_isSelf && !_isHidden)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white70),
+              color: const Color(0xff1a1a1a),
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'share', child: Text('分享主页')),
+                const PopupMenuItem(value: 'report', child: Text('举报')),
+              ],
+              onSelected: (value) {
+                if (value == 'share') _shareProfile();
+                if (value == 'report') _reportUser();
+              },
+            ),
+          if (isDialog && backButton != null) backButton,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactContent() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: _buildFrame(isExpanded: false, isCompact: true),
+    );
+  }
+
+  Widget _buildDesktopContent(bool showBottomActions) {
+    return Column(
+      children: [
+        Expanded(child: _buildFrame(isExpanded: true, isCompact: false)),
+        if (showBottomActions) ...[
+          const SizedBox(height: 12),
+          _buildBottomActions(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildFrame({required bool isExpanded, required bool isCompact}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xff2D2C2D),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        padding: const EdgeInsets.all(4),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              _buildTabBar(isCompact),
+              isExpanded
+                  ? Expanded(
+                      child: _buildAFrame(
+                          isExpanded: true, isCompact: isCompact))
+                  : _buildAFrame(isExpanded: false, isCompact: isCompact),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDesktopStatsBox() {
-    if (_profile == null) {
-      return Card(
-        color: const Color(0xff1E1E1E),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
+  Widget _buildAFrame({required bool isExpanded, required bool isCompact}) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xff010101), Color(0xff161616)],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: isExpanded ? MainAxisSize.max : MainAxisSize.min,
+        children: [
+          _buildBannerCard(isCompact),
+          if (isExpanded)
+            Expanded(
+              child: _buildArticleGrid(
+                isCompact: isCompact,
+                isExpanded: true,
+              ),
+            )
+          else
+            _buildArticleGrid(
+              isCompact: isCompact,
+              isExpanded: false,
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Tab Bar ───────────────────────────────────────────────────────
+
+  Widget _buildTabBar(bool isCompact) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 14 : 20,
+        vertical: isCompact ? 8 : 10,
+      ),
+      decoration: const BoxDecoration(
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xff161616), Color(0xff080808)],
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/tab-bg-point.webp',
+              repeat: ImageRepeat.repeat,
+              fit: BoxFit.none,
+              alignment: Alignment.topLeft,
+              opacity: const AlwaysStoppedAnimation(0.35),
+            ),
           ),
-        ),
-        child: const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
+          Row(
+            children: [
+              _buildUidPill(isCompact),
+              const Spacer(),
+              _buildTabBarActions(isCompact),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUidPill(bool isCompact) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 14,
+        vertical: isCompact ? 5 : 6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'UID:',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isCompact ? 12 : 14,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            _uid?.toString() ?? '-',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isCompact ? 12 : 14,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(width: 2),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _uid != null ? _copyUid : null,
+              borderRadius: BorderRadius.circular(999),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.copy,
+                  size: isCompact ? 13 : 14,
+                  color: Colors.white54,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBarActions(bool isCompact) {
+    if (_isSelf) {
+      return _buildActionButton(
+        label: '更多操作',
+        onTap: _openSettings,
+        isCompact: isCompact,
       );
     }
 
-    final stats = _profile!['stats'] as Map?;
-    final totalViews = stats?['totalViews'] as int? ?? 0;
-    final totalComments = stats?['totalComments'] as int? ?? 0;
-    final totalLikes = stats?['totalLikes'] as int? ?? 0;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!_isHidden)
+          _buildActionButton(
+            label: _isFollowing ? '已关注' : '关注',
+            onTap: _isFollowingLoading ? null : _toggleFollow,
+            isCompact: isCompact,
+          ),
+        if (!_isHidden) ...[
+          const SizedBox(width: 8),
+          _buildActionButton(
+            label: '私信',
+            onTap: _dmStarting ? null : _startDm,
+            isCompact: isCompact,
+          ),
+        ],
+      ],
+    );
+  }
 
-    return Card(
-      color: const Color(0xff1E1E1E),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
+  Widget _buildActionButton({
+    required String label,
+    required VoidCallback? onTap,
+    required bool isCompact,
+    bool isPrimary = false,
+    bool highlight = false,
+    bool loading = false,
+  }) {
+    return ZzzButton(
+      size: isCompact ? ZzzButtonSize.small : ZzzButtonSize.defaults,
+      type: isPrimary ? ZzzButtonType.success : ZzzButtonType.defaults,
+      highlight: highlight,
+      loading: loading,
+      disabled: onTap == null,
+      onPressed: onTap,
+      label: label,
+    );
+  }
+
+  // ── Banner Card ───────────────────────────────────────────────────
+
+  Widget _buildBannerCard(bool isCompact) {
+    return Container(
+      margin: EdgeInsets.fromLTRB(isCompact ? 10 : 16, 12, isCompact ? 10 : 16, 0),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xff2a2d33),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              '统计数据',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildDesktopStatItem(Icons.visibility_outlined, '浏览', totalViews),
-            const SizedBox(height: 16),
-            _buildDesktopStatItem(
-                Icons.comment_outlined, '收到评论', totalComments),
-            const SizedBox(height: 16),
-            _buildDesktopStatItem(Icons.thumb_up_outlined, '点赞', totalLikes),
+            _buildBanner(isCompact),
+            _buildBannerFooter(isCompact),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDesktopStatItem(IconData icon, String label, int value) {
-    return Row(
+  Widget _buildBanner(bool isCompact) {
+    final avatarSize = isCompact ? 68.0 : 90.0;
+    final borderWidth = isCompact ? 3.0 : 4.0;
+    final badgeSize = isCompact ? 28.0 : 32.0;
+    final nameFontSize = isCompact ? 22.0 : 30.0;
+
+    return Stack(
       children: [
-        Icon(icon, color: const Color(0xffD7FF00), size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.grey,
+        Positioned.fill(child: _buildBannerBackground()),
+        Container(
+          width: double.infinity,
+          constraints: BoxConstraints(minHeight: isCompact ? 220 : 240),
+          padding: EdgeInsets.all(isCompact ? 18 : 36),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withValues(alpha: 0.2),
+                Colors.black.withValues(alpha: 0.55),
+              ],
             ),
           ),
-        ),
-        Text(
-          value.toString(),
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.black,
+                            width: borderWidth,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Avatar(_avatarUrl, size: avatarSize),
+                      ),
+                      Positioned(
+                        top: -borderWidth,
+                        left: -borderWidth,
+                        child: Container(
+                          constraints: BoxConstraints(minWidth: badgeSize),
+                          height: badgeSize,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.black,
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$_level',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isCompact ? 12 : 13,
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(width: isCompact ? 14 : 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(top: isCompact ? 2 : 6),
+                          child: Text(
+                            _name,
+                            style: TextStyle(
+                              fontSize: nameFontSize,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1.1,
+                              letterSpacing: 0.5,
+                              shadows: const [
+                                Shadow(
+                                  color: Color(0x66000000),
+                                  offset: Offset(1, 1),
+                                  blurRadius: 2,
+                                ),
+                              ],
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(height: isCompact ? 8 : 10),
+                        _buildTitleTag(isCompact),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (_isSelf && _profileHidden) ...[
+                SizedBox(height: isCompact ? 12 : 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Text(
+                    '个人资料已隐藏，仅自己可见',
+                    style: TextStyle(
+                      color: Color(0xffffcf3b),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              SizedBox(height: isCompact ? 18 : 24),
+              _buildStatsRow(isCompact),
+            ],
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBannerBackground() {
+    final url = _bannerImageUrl;
+    if (url != null && url.isNotEmpty) {
+      return CachedImage(
+        url: url,
+        fit: BoxFit.cover,
+        errorBuilder: (_) => Image.asset(
+          'assets/images/pc-page-bg.png',
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    return Image.asset(
+      'assets/images/pc-page-bg.png',
+      fit: BoxFit.cover,
+    );
+  }
+
+  Widget _buildTitleTag(bool isCompact) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: isCompact ? 12 : 16,
+        vertical: isCompact ? 4 : 5,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            offset: const Offset(0, 2),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Text(
+        '暂无称号',
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.6),
+          fontSize: isCompact ? 13 : 14,
+          fontWeight: FontWeight.w700,
+          fontStyle: FontStyle.italic,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsRow(bool isCompact) {
+    final items = [
+      ('浏览', _stat('totalViews')),
+      ('评论', _stat('totalComments')),
+      ('点赞', _stat('totalLikes')),
+      ('关注', _followingCount),
+      ('粉丝', _followersCount),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isCompact ? 6 : 10),
+                child: Text(
+                  '-',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: isCompact ? 13 : 15,
+                    fontWeight: FontWeight.w700,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x99000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  items[i].$1,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: isCompact ? 13 : 15,
+                    fontWeight: FontWeight.w700,
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x99000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _formatNumber(items[i].$2),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isCompact ? 13 : 15,
+                    fontWeight: FontWeight.w900,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    shadows: const [
+                      Shadow(
+                        color: Color(0x99000000),
+                        offset: Offset(0, 1),
+                        blurRadius: 4,
+                      ),
+                      Shadow(
+                        color: Color(0x99000000),
+                        offset: Offset(0, 0),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerFooter(bool isCompact) {
+    final hasBio = _bioText.isNotEmpty;
+    return ZzzPattern(
+      type: ZzzPatternType.squares,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          horizontal: isCompact ? 18 : 34,
+          vertical: 8,
+        ),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Colors.black, width: 2),
+          ),
+        ),
+        child: Text(
+          hasBio ? _bioText : '这个人很神秘，什么都没有留下。',
+          style: TextStyle(
+            color: hasBio
+                ? Colors.white.withValues(alpha: 0.95)
+                : Colors.white.withValues(alpha: 0.35),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            height: 1.5,
+            fontStyle: hasBio ? FontStyle.normal : FontStyle.italic,
+          ),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    );
+  }
+
+  // ── Article Grid ──────────────────────────────────────────────────
+
+  Widget _buildArticleGrid({
+    required bool isCompact,
+    required bool isExpanded,
+  }) {
+    if (_isHidden) {
+      return Container(
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(32),
+        child: const Text(
+          '该用户已隐藏个人资料',
+          style: TextStyle(
+            color: Color(0xff555555),
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    final width = MediaQuery.of(context).size.width;
+    int crossAxisCount;
+    if (isCompact) {
+      crossAxisCount = 2;
+    } else if (width >= 1024) {
+      crossAxisCount = 6;
+    } else {
+      crossAxisCount = 3;
+    }
+
+    return DiscussionGrid(
+      list: _articles,
+      hasNextPage: _hasMoreArticles,
+      fetchData: _loadArticles,
+      reorderHistoryOnOpen: false,
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: isCompact ? 10 : 12,
+      crossAxisSpacing: isCompact ? 8 : 10,
+      gridPadding: const EdgeInsets.fromLTRB(10, 16, 10, 16),
+      shrinkWrap: !isExpanded,
+      physics: isExpanded ? null : const NeverScrollableScrollPhysics(),
+      emptyMessage: '还没有发布任何内容哦',
+      onOpenItem: (context, item, discussion) => _openArticle(item, discussion),
+    );
+  }
+
+  // ── Bottom Actions (Desktop self) ─────────────────────────────────
+
+  Widget _buildBottomActions() {
+    final canCheckIn = _checkInStatus['canCheckIn'] == true;
+    final totalDays = (_checkInStatus['totalDays'] as int?) ?? 0;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: _showCheckInHelp,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white70,
+                padding: const EdgeInsets.all(8),
+                minimumSize: const Size(32, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                '?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            _buildActionButton(
+              label: canCheckIn && !_checkInLoading
+                  ? '今日签到${totalDays > 0 ? ' ($totalDays天)' : ''}'
+                  : '已签到${totalDays > 0 ? ' ($totalDays天)' : ''}',
+              onTap: _checkInLoading ? null : _doCheckIn,
+              isCompact: false,
+              highlight: true,
+              loading: _checkInLoading,
+            ),
+          ],
+        ),
+        const SizedBox(width: 10),
+        _buildActionButton(
+          label: '修改头像',
+          onTap: _openAvatarSettings,
+          isCompact: false,
+        ),
+        const SizedBox(width: 10),
+        _buildActionButton(
+          label: '修改称号',
+          onTap: null,
+          isCompact: false,
+        ),
+        const SizedBox(width: 10),
+        _buildActionButton(
+          label: '修改勋章',
+          onTap: null,
+          isCompact: false,
+        ),
+        const SizedBox(width: 10),
+        _buildActionButton(
+          label: '修改名片',
+          onTap: _openCardSettings,
+          isCompact: false,
         ),
       ],
     );

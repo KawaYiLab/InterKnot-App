@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/click_region.dart';
 import 'package:inter_knot/components/discussion_card.dart'
     show NetworkImageBox;
@@ -12,10 +13,16 @@ class Cover extends StatefulWidget {
     super.key,
     required this.discussion,
     this.onImageLoaded,
+    this.isMobile = false,
+    this.maxHeight,
+    this.borderRadius,
   });
 
   final DiscussionModel discussion;
   final void Function(double aspectRatio)? onImageLoaded;
+  final bool isMobile;
+  final double? maxHeight;
+  final BorderRadius? borderRadius;
 
   @override
   State<Cover> createState() => _CoverState();
@@ -24,6 +31,8 @@ class Cover extends StatefulWidget {
 class _CoverState extends State<Cover> {
   final _controller = PageController();
   int _currentIndex = 0;
+
+  double? _lastReportedAspectRatio;
 
   @override
   void dispose() {
@@ -35,9 +44,11 @@ class _CoverState extends State<Cover> {
   Widget build(BuildContext context) {
     final covers = widget.discussion.covers;
 
+    final coverRadius = widget.borderRadius ?? BorderRadius.circular(8);
+
     if (covers.isEmpty) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: coverRadius,
         child: Assets.images.defaultCover.image(fit: BoxFit.contain),
       );
     }
@@ -55,36 +66,39 @@ class _CoverState extends State<Cover> {
             heroTagPrefix: 'cover-${widget.discussion.id}',
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              url,
-              fit: BoxFit.contain,
-              gaplessPlayback: true,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) {
-                  return child;
-                }
-                return const SizedBox.shrink();
-              },
-              errorBuilder: (context, error, stackTrace) =>
-                  Assets.images.defaultCover.image(fit: BoxFit.contain),
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (frame != null && widget.onImageLoaded != null) {
-                  // 图片加载完成，获取实际尺寸
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final imageStream = NetworkImage(url).resolve(
-                      const ImageConfiguration(),
-                    );
-                    imageStream.addListener(
-                      ImageStreamListener((info, _) {
-                        final image = info.image;
-                        final aspectRatio = image.width / image.height;
-                        widget.onImageLoaded?.call(aspectRatio);
-                      }),
-                    );
-                  });
-                }
-                return child;
+            borderRadius: coverRadius,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final dpr = MediaQuery.devicePixelRatioOf(context);
+                final maxWidth = constraints.maxWidth;
+                final maxHeight = constraints.maxHeight;
+                final cacheWidth = maxWidth.isFinite
+                    ? (maxWidth * dpr).ceil().clamp(1, 9999)
+                    : null;
+                final cacheHeight = maxHeight.isFinite
+                    ? (maxHeight * dpr).ceil().clamp(1, 9999)
+                    : null;
+
+                return CachedImage(
+                  url: url,
+                  fit: BoxFit.contain,
+                  gaplessPlayback: true,
+                  cacheWidth: cacheWidth,
+                  cacheHeight: cacheHeight,
+                  onImageInfo: widget.onImageLoaded == null
+                      ? null
+                      : (size) {
+                          if (size.width <= 0 || size.height <= 0) return;
+                          final aspectRatio = size.width / size.height;
+                          if (_lastReportedAspectRatio == aspectRatio) return;
+                          _lastReportedAspectRatio = aspectRatio;
+                          widget.onImageLoaded?.call(aspectRatio);
+                        },
+                  loadingBuilder: (_, __) => const SizedBox.shrink(),
+                  errorBuilder: (_) => Assets.images.defaultCover.image(
+                    fit: BoxFit.contain,
+                  ),
+                );
               },
             ),
           ),
@@ -92,8 +106,9 @@ class _CoverState extends State<Cover> {
       );
     }
 
+    final multiHeight = widget.maxHeight ?? 220;
     return SizedBox(
-      height: 220,
+      height: multiHeight,
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
@@ -121,7 +136,7 @@ class _CoverState extends State<Cover> {
                       heroTagPrefix: 'cover-${widget.discussion.id}',
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: coverRadius,
                       child: NetworkImageBox(
                         url: url,
                         fit: BoxFit.contain,

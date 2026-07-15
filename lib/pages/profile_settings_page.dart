@@ -3,9 +3,11 @@ import 'package:get/get.dart';
 import 'package:inter_knot/api/api.dart';
 import 'package:inter_knot/api/api_exception.dart';
 import 'package:inter_knot/components/avatar.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/controllers/data.dart';
 import 'package:inter_knot/helpers/toast.dart';
 import 'package:inter_knot/models/author.dart';
+import 'package:inter_knot/zzzui/zzzui.dart';
 import 'package:inter_knot/utils/level_utils.dart';
 
 class ProfileSettingsPage extends StatefulWidget {
@@ -347,53 +349,46 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     const SizedBox(height: 24),
                     // Name
-                    TextField(
+                    ZzzInput(
                       controller: _nameController,
+                      hintText: '用户名',
                       maxLength: 20,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: '用户名',
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xffD7FF00)),
-                        ),
-                      ),
                     ),
                     const SizedBox(height: 16),
                     // Bio
-                    TextField(
+                    ZzzInput(
                       controller: _bioController,
+                      hintText: '签名',
                       maxLength: 100,
-                      maxLines: 3,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: '签名',
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xffD7FF00)),
-                        ),
-                      ),
+                      minLines: 2,
+                      maxLines: 5,
                     ),
                     const SizedBox(height: 16),
                     // Visibility
-                    Obx(() => SwitchListTile(
-                          title: const Text(
-                            '主页隐身',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          subtitle: const Text(
-                            '开启后他人无法查看你的主页内容',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                          value: c.user.value?.profileHidden ?? false,
-                          activeColor: const Color(0xffD7FF00),
-                          onChanged: _toggleVisibility,
+                    Obx(() => Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '主页隐身',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '开启后他人无法查看你的主页内容',
+                                    style: TextStyle(
+                                        color: Colors.grey, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ZzzSwitch(
+                              value: c.user.value?.profileHidden ?? false,
+                              onChanged: _toggleVisibility,
+                            ),
+                          ],
                         )),
                     const SizedBox(height: 16),
                     // Avatar library
@@ -466,6 +461,8 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
         itemBuilder: (context, index) {
           final item = _avatars[index];
           final selected = item['documentId'] == _equippedAvatarId;
+          final avatarUrl = item['url']?.toString() ?? '';
+          final dpr = MediaQuery.devicePixelRatioOf(context);
           return GestureDetector(
             onTap: () => _equipAvatar(item['documentId']?.toString()),
             child: Column(
@@ -482,10 +479,17 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                           : const Color(0xff2A2A2A),
                       width: selected ? 3 : 1,
                     ),
-                    image: DecorationImage(
-                      image: NetworkImage(item['url'].toString()),
-                      fit: BoxFit.cover,
-                    ),
+                    image: avatarUrl.isNotEmpty
+                        ? DecorationImage(
+                            image: cachedImageProvider(
+                              avatarUrl,
+                              width: 72,
+                              height: 72,
+                              dpr: dpr,
+                            )!,
+                            fit: BoxFit.cover,
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -521,6 +525,7 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
           final item = _cards[index];
           final selected = item['documentId'] == _equippedCardId;
           final url = item['url']?.toString();
+          final dpr = MediaQuery.devicePixelRatioOf(context);
           return GestureDetector(
             onTap: () => _equipCard(item['documentId']?.toString()),
             child: Column(
@@ -539,7 +544,12 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage> {
                     ),
                     image: url != null && url.isNotEmpty
                         ? DecorationImage(
-                            image: NetworkImage(url),
+                            image: cachedImageProvider(
+                              url,
+                              width: 100,
+                              height: 72,
+                              dpr: dpr,
+                            )!,
                             fit: BoxFit.cover,
                           )
                         : null,

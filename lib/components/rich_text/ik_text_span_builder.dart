@@ -1,6 +1,7 @@
 import 'package:extended_text/extended_text.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/models/emote.dart';
 
 /// 点击 mention 的回调，参数为 authorDocumentId。
@@ -89,8 +90,13 @@ class _EmoteSpecialText extends RegExpSpecialText {
     }
 
     const size = 24.0;
+    const cacheSize = 72;
     return ImageSpan(
-      NetworkImage(emote.url),
+      cachedImageProvider(
+        emote.url,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+      )!,
       imageWidth: size,
       imageHeight: size,
       actualText: ':$code:',

@@ -15,9 +15,12 @@ import 'package:inter_knot/controllers/messaging_controller.dart';
 import 'package:inter_knot/helpers/app_scroll_behavior.dart';
 import 'package:inter_knot/helpers/box.dart';
 import 'package:inter_knot/helpers/toast.dart';
+import 'package:inter_knot/helpers/page_transition_helper.dart';
 import 'package:inter_knot/pages/create_discussion_page.dart';
 import 'package:inter_knot/pages/home_page.dart';
+import 'package:inter_knot/pages/level_page.dart';
 import 'package:inter_knot/pages/message_center_page.dart';
+import 'package:inter_knot/pages/profile_page.dart';
 import 'package:inter_knot/pages/search_page.dart';
 import 'package:inter_knot/services/update_service.dart';
 
@@ -205,16 +208,14 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _BottomNavItem(
                     isSelected: c.selectedIndex.value == 0,
-                    icon: Icons.explore_outlined,
-                    activeIcon: Icons.explore,
+                    icon: Icons.home_outlined,
+                    activeIcon: Icons.home,
                     label: '推送',
                     onTap: () => c.animateToPage(0, animate: false),
                     onDoubleTap: () {
-                      // Double tap to refresh posts
                       if (c.selectedIndex.value == 0) {
                         c.refreshSearchData();
                         showToast('正在刷新帖子...',
@@ -222,15 +223,78 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                   ),
+                  _BottomNavItem(
+                    isSelected: false,
+                    icon: Icons.chat_bubble_outline,
+                    activeIcon: Icons.chat_bubble,
+                    label: '敲敲',
+                    badge: Obx(() {
+                      final count = c.unreadNotificationCount.value;
+                      if (count <= 0) return const SizedBox.shrink();
+                      return _buildBadge(count);
+                    }),
+                    onTap: () async {
+                      if (!await c.ensureLogin(context: context)) return;
+                      if (!context.mounted) return;
+                      navigateWithSlideTransition(
+                        context,
+                        const MessageCenterPage(),
+                        routeName: '/messages',
+                      );
+                    },
+                  ),
                   Center(
                     child: _buildCreateButton(context),
                   ),
                   _BottomNavItem(
-                    isSelected: c.selectedIndex.value == 1,
+                    isSelected: false,
+                    label: '等级',
+                    customIcon: const Text(
+                      'LV',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
+                    ),
+                    activeCustomIcon: const Text(
+                      'LV',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
+                    ),
+                    onTap: () async {
+                      if (!await c.ensureLogin(context: context)) return;
+                      if (!context.mounted) return;
+                      navigateWithSlideTransition(
+                        context,
+                        const LevelPage(),
+                        routeName: '/level',
+                      );
+                    },
+                  ),
+                  _BottomNavItem(
+                    isSelected: false,
                     icon: Icons.person_outline,
                     activeIcon: Icons.person,
                     label: '我的',
-                    onTap: () => c.animateToPage(1, animate: false),
+                    onTap: () async {
+                      if (!await c.ensureLogin(context: context)) return;
+                      if (!context.mounted) return;
+                      final authorId = c.authorId.value ??
+                          c.user.value?.authorId;
+                      if (authorId != null && authorId.isNotEmpty) {
+                        navigateWithSlideTransition(
+                          context,
+                          ProfilePage(authorDocumentId: authorId),
+                          routeName: '/profile/me',
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -276,19 +340,25 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class _BottomNavItem extends StatefulWidget {
   final bool isSelected;
-  final IconData icon;
-  final IconData activeIcon;
+  final IconData? icon;
+  final IconData? activeIcon;
+  final Widget? customIcon;
+  final Widget? activeCustomIcon;
   final String label;
   final VoidCallback onTap;
   final VoidCallback? onDoubleTap;
+  final Widget? badge;
 
   const _BottomNavItem({
     required this.isSelected,
-    required this.icon,
-    required this.activeIcon,
+    this.icon,
+    this.activeIcon,
+    this.customIcon,
+    this.activeCustomIcon,
     required this.label,
     required this.onTap,
     this.onDoubleTap,
+    this.badge,
   });
 
   @override
@@ -317,6 +387,12 @@ class _BottomNavItemState extends State<_BottomNavItem> {
 
   @override
   Widget build(BuildContext context) {
+    final iconWidget = widget.isSelected
+        ? (widget.activeCustomIcon ??
+            Icon(widget.activeIcon!, color: Colors.white, size: 24))
+        : (widget.customIcon ??
+            Icon(widget.icon!, color: Colors.white, size: 24));
+
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -328,10 +404,17 @@ class _BottomNavItemState extends State<_BottomNavItem> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                widget.isSelected ? widget.activeIcon : widget.icon,
-                color: Colors.white,
-                size: 24,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  iconWidget,
+                  if (widget.badge != null)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: widget.badge!,
+                    ),
+                ],
               ),
               const SizedBox(height: 2),
               Text(
@@ -401,9 +484,9 @@ class _AnimatedCreateButtonState extends State<_AnimatedCreateButton>
             customBorder: const CircleBorder(),
             onTap: widget.onTap,
             child: const SizedBox(
-              width: 44,
-              height: 44,
-              child: Icon(Icons.add, color: Colors.black, size: 24),
+              width: 54,
+              height: 54,
+              child: Icon(Icons.add, color: Colors.black, size: 26),
             ),
           ),
         );
@@ -411,3 +494,26 @@ class _AnimatedCreateButtonState extends State<_AnimatedCreateButton>
     );
   }
 }
+
+Widget _buildBadge(int count) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+    decoration: BoxDecoration(
+      color: Colors.red,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.black, width: 1.5),
+    ),
+    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+    child: Text(
+      count > 99 ? '99+' : count.toString(),
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        height: 1,
+      ),
+      textAlign: TextAlign.center,
+    ),
+  );
+}
+

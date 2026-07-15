@@ -46,10 +46,10 @@ class _DiscussionPageState extends State<DiscussionPage> {
   bool _isDetailLoading = true;
   double? _mobileCoverAspectRatio; // 移动端封面的实际宽高比
 
-  // 移动端封面使用图片加载后的实际宽高比，如果还没加载完则使用默认值 16:9
+  // 移动端封面使用图片加载后的实际宽高比，如果还没加载完则使用默认值 643/408
   // 限制最小宽高比为 0.6，防止竖图过高
   double _getMobileCoverAspectRatio() {
-    final aspectRatio = _mobileCoverAspectRatio ?? (16 / 9);
+    final aspectRatio = _mobileCoverAspectRatio ?? (643 / 408);
     // 最小宽高比 0.6 (3:5)，即高度最多是宽度的 1.67 倍
     return aspectRatio < 0.6 ? 0.6 : aspectRatio;
   }
@@ -257,9 +257,12 @@ class _DiscussionPageState extends State<DiscussionPage> {
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
     final isDesktop = screenW >= 800;
-    final double baseFactor = isDesktop ? 0.7 : 0.9;
+    final isFullScreen = screenW < 500;
+    final double baseFactor = isDesktop ? 0.7 : (isFullScreen ? 1.0 : 0.9);
     final double zoomScale = isDesktop ? 1.1 : 1.0;
     final double layoutFactor = baseFactor * zoomScale;
+    final double outerRadius = isFullScreen ? 0 : 24;
+    final double innerRadius = isFullScreen ? 0 : 22;
 
     return SafeArea(
       child: Center(
@@ -271,34 +274,39 @@ class _DiscussionPageState extends State<DiscussionPage> {
               width: safeW * layoutFactor,
               height: safeH * layoutFactor,
               child: FittedBox(
+                fit: BoxFit.contain,
                 child: SizedBox(
                   width: safeW * baseFactor,
                   height: safeH * baseFactor,
                   child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Color.fromARGB(59, 255, 255, 255),
+                    padding: isFullScreen
+                        ? EdgeInsets.zero
+                        : const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(59, 255, 255, 255),
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        bottomLeft: Radius.circular(16),
-                        bottomRight: Radius.circular(16),
+                        topLeft: Radius.circular(outerRadius),
+                        bottomLeft: Radius.circular(outerRadius),
+                        bottomRight: Radius.circular(outerRadius),
                       ),
                     ),
                     child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
+                      padding: isFullScreen
+                          ? EdgeInsets.zero
+                          : const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
                         color: Colors.black,
                         borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
+                          topLeft: Radius.circular(innerRadius),
+                          bottomLeft: Radius.circular(innerRadius),
+                          bottomRight: Radius.circular(innerRadius),
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(16),
-                          bottomLeft: Radius.circular(16),
-                          bottomRight: Radius.circular(16),
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(innerRadius),
+                          bottomLeft: Radius.circular(innerRadius),
+                          bottomRight: Radius.circular(innerRadius),
                         ),
                         child: Scaffold(
                           backgroundColor: const Color(0xff121212),
@@ -306,108 +314,13 @@ class _DiscussionPageState extends State<DiscussionPage> {
                             children: [
                               DiscussionHeaderBar(
                                 discussion: widget.discussion,
+                                isMobile: !isDesktop,
                               ),
                               Expanded(
                                 child: LayoutBuilder(
                                   builder: (context, con) {
-                                    if (con.maxWidth < 600) {
-                                      return Stack(
-                                        children: [
-                                          CustomScrollView(
-                                            controller: scrollController,
-                                            slivers: [
-                                              SliverToBoxAdapter(
-                                                child: AspectRatio(
-                                                  // 根据封面原始尺寸动态调整：横图适中、竖图更高
-                                                  aspectRatio:
-                                                      _getMobileCoverAspectRatio(),
-                                                  child: SizedBox(
-                                                    width: double.infinity,
-                                                    // 移动端也与桌面端保持一致：只在详情加载完成后渲染封面，避免先用列表缩略图再替换为详情大图造成闪烁
-                                                    child: _isDetailLoading
-                                                        ? const SizedBox
-                                                            .shrink()
-                                                        : Cover(
-                                                            discussion: widget
-                                                                .discussion,
-                                                            onImageLoaded:
-                                                                (aspectRatio) {
-                                                              if (mounted) {
-                                                                setState(() {
-                                                                  _mobileCoverAspectRatio =
-                                                                      aspectRatio;
-                                                                });
-                                                              }
-                                                            },
-                                                          ),
-                                                  ),
-                                                ),
-                                              ),
-                                              SliverToBoxAdapter(
-                                                child: _isDetailLoading
-                                                    ? const SizedBox.shrink()
-                                                    : DiscussionDetailBox(
-                                                        discussion:
-                                                            widget.discussion,
-                                                      ),
-                                              ),
-                                              SliverToBoxAdapter(
-                                                child: DiscussionActionButtons(
-                                                  key: actionButtonsKey,
-                                                  discussion:
-                                                      widget.discussion,
-                                                  hData: widget.hData,
-                                                  onCommentAdded:
-                                                      _handleCommentAdded,
-                                                  onEditSuccess: () {
-                                                    _fetchArticleDetails();
-                                                  },
-                                                ),
-                                              ),
-                                              SliverToBoxAdapter(
-                                                child: Padding(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 16),
-                                                  child: Column(
-                                                    children: [
-                                                      const SizedBox(
-                                                          height: 16),
-                                                      const Divider(),
-                                                      DiscussionCommentSection(
-                                                        discussion:
-                                                            widget.discussion,
-                                                        isInitialLoading:
-                                                            _isInitialLoading,
-                                                        onReply: (
-                                                          id,
-                                                          userName, {
-                                                          addPrefix = false,
-                                                          authorDocumentId,
-                                                        }) =>
-                                                            actionButtonsKey
-                                                                .currentState
-                                                                ?.replyTo(
-                                                          id,
-                                                          userName,
-                                                          addPrefix: addPrefix,
-                                                          authorDocumentId:
-                                                              authorDocumentId,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          NewCommentNotification(
-                                            countsListenable: _newCommentCounts,
-                                            onTap:
-                                                _handleNewCommentNotificationTap,
-                                          ),
-                                        ],
-                                      );
+                                    if (con.maxWidth < 800) {
+                                      return _buildMobileBody(context, con);
                                     }
                                     return DiscussionDesktopBody(
                                       discussion: widget.discussion,
@@ -421,7 +334,8 @@ class _DiscussionPageState extends State<DiscussionPage> {
                                       buildNewCommentNotification: () =>
                                           NewCommentNotification(
                                         countsListenable: _newCommentCounts,
-                                        onTap: _handleNewCommentNotificationTap,
+                                        onTap:
+                                            _handleNewCommentNotificationTap,
                                       ),
                                       onCommentAdded: _handleCommentAdded,
                                       onEditSuccess: () {
@@ -443,6 +357,97 @@ class _DiscussionPageState extends State<DiscussionPage> {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildMobileBody(BuildContext context, BoxConstraints constraints) {
+    final maxCoverHeight = constraints.maxHeight * 0.5;
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              CustomScrollView(
+                controller: scrollController,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: maxCoverHeight),
+                      child: AspectRatio(
+                        aspectRatio: _getMobileCoverAspectRatio(),
+                        child: _isDetailLoading
+                            ? const SizedBox.shrink()
+                            : Cover(
+                                discussion: widget.discussion,
+                                isMobile: true,
+                                maxHeight: maxCoverHeight,
+                                borderRadius: BorderRadius.zero,
+                                onImageLoaded: (aspectRatio) {
+                                  if (mounted) {
+                                    setState(() {
+                                      _mobileCoverAspectRatio = aspectRatio;
+                                    });
+                                  }
+                                },
+                              ),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _isDetailLoading
+                        ? const SizedBox.shrink()
+                        : DiscussionDetailBox(
+                            discussion: widget.discussion,
+                          ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          DiscussionCommentSection(
+                            discussion: widget.discussion,
+                            isInitialLoading: _isInitialLoading,
+                            onReply: (
+                              id,
+                              userName, {
+                              addPrefix = false,
+                              authorDocumentId,
+                            }) =>
+                                actionButtonsKey.currentState?.replyTo(
+                              id,
+                              userName,
+                              addPrefix: addPrefix,
+                              authorDocumentId: authorDocumentId,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              NewCommentNotification(
+                countsListenable: _newCommentCounts,
+                onTap: _handleNewCommentNotificationTap,
+              ),
+            ],
+          ),
+        ),
+        DiscussionActionButtons(
+          key: actionButtonsKey,
+          discussion: widget.discussion,
+          hData: widget.hData,
+          isMobile: true,
+          onCommentAdded: _handleCommentAdded,
+          onEditSuccess: () {
+            _fetchArticleDetails();
+          },
+        ),
+      ],
     );
   }
 }

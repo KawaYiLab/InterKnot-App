@@ -17,9 +17,11 @@ class DiscussionHeaderBar extends StatelessWidget {
   const DiscussionHeaderBar({
     super.key,
     required this.discussion,
+    this.isMobile = false,
   });
 
   final DiscussionModel discussion;
+  final bool isMobile;
 
   @override
   Widget build(BuildContext context) {
@@ -149,32 +151,34 @@ class DiscussionHeaderBar extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          ClickRegion(
-            child: const Icon(
-              Icons.share,
-              color: Color(0xffB0B0B0),
-              size: 22,
+          if (!isMobile) ...[
+            const SizedBox(width: 8),
+            ClickRegion(
+              child: const Icon(
+                Icons.share,
+                color: Color(0xffB0B0B0),
+                size: 22,
+              ),
+              onTap: () => ShareHelper.sharePost(discussion.id),
             ),
-            onTap: () => ShareHelper.sharePost(discussion.id),
-          ),
-          const SizedBox(width: 8),
-          ClickRegion(
-            child: const Icon(
-              Icons.outlined_flag,
-              color: Color(0xffB0B0B0),
-              size: 22,
+            const SizedBox(width: 8),
+            ClickRegion(
+              child: const Icon(
+                Icons.outlined_flag,
+                color: Color(0xffB0B0B0),
+                size: 22,
+              ),
+              onTap: () async {
+                if (!await c.ensureLogin()) return;
+                if (!context.mounted) return;
+                showReportSheet(
+                  context,
+                  targetType: 'article',
+                  targetId: discussion.id,
+                );
+              },
             ),
-            onTap: () async {
-              if (!await c.ensureLogin()) return;
-              if (!context.mounted) return;
-              showReportSheet(
-                context,
-                targetType: 'article',
-                targetId: discussion.id,
-              );
-            },
-          ),
+          ],
           const SizedBox(width: 8),
           ClickRegion(
             child: Assets.images.closeBtn.image(),

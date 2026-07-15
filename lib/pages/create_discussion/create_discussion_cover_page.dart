@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:inter_knot/components/cached_image.dart';
 import 'package:inter_knot/components/image_viewer.dart';
 import 'package:inter_knot/helpers/upload_task.dart';
 
@@ -201,10 +202,10 @@ class _UploadTaskTile extends StatelessWidget {
               );
             }
           },
-          child: Image.network(
-            task.serverUrl!,
+          child: CachedImage(
+            url: task.serverUrl!,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const Center(
+            errorBuilder: (_) => const Center(
               child: Icon(Icons.broken_image, color: Colors.grey),
             ),
           ),
@@ -214,10 +215,10 @@ class _UploadTaskTile extends StatelessWidget {
 
     // Pending/compressing/uploading/error — show local preview
     if (task.localPreviewBytes != null) {
-      return Image.memory(
-        task.localPreviewBytes!,
+      return CachedImage(
+        bytes: task.localPreviewBytes!,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (_) => Container(
           color: const Color(0xff1E1E1E),
           child: const Center(
             child: Icon(Icons.image, color: Colors.grey),
